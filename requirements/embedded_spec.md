@@ -69,18 +69,20 @@
 
 # 4. Embedding Provider 抽象化（設定で切替）
 - Embedding Provider は設定で切り替え可能に抽象化:
-  - provider: "ollama" | "openai" | "local"
-  - local は将来用で stub（NotImplemented）でよいが、型/IFは揃える
+  - provider: "openai" | "ollama" | "local"
+- 最初のバージョンは "openai" を実装する。
+  - OpenAI: embeddings endpoint を net/http で叩く（apiKey必須。未設定ならJSON-RPC error）
+  - Ollama: 将来実装（stub: NotImplemented）
+  - local: 将来実装（stub: NotImplemented）
 - Embedding の次元 mismatch を避けるため、namespace を provider+model+dim から自動生成する。
   - 例: "{provider}:{model}:{dim}"
   - dim は初回埋め込み時にprovider応答から取得し、設定に記録する
 - provider変更時は namespace が変わる（古いデータは残るが別namespace）。
-- Embedding:
-  - Ollama: http://localhost:11434 の /api/embeddings を叩く実装を用意
-    - request: { "model": "<model>", "prompt": "<text>" }
-    - response から embedding を取得（ベクトル長からdimを判定）
-  - OpenAI: embeddings endpoint を net/http で叩く（apiKey必須。未設定ならJSON-RPC error）
-  - local: NotImplemented
+
+## Ollama実装（将来）
+- Ollama: http://localhost:11434 の /api/embeddings を叩く実装を用意
+  - request: { "model": "<model>", "prompt": "<text>" }
+  - response から embedding を取得（ベクトル長からdimを判定）
 
 # 5. VectorStore 抽象化（設定で切替）
 - Vector store も設定で切り替え可能に抽象化:
@@ -299,15 +301,16 @@ Output:
   - stdio と HTTP の起動例
   - curl で HTTP JSON-RPC を叩く例
   - stdio の NDJSON 例
-  - Ollama が無い/起動してない場合の対処
+  - OpenAI apiKey 設定方法（環境変数 or 設定ファイル）
   - provider切替で namespace が変わる説明（embedding dim mismatch回避のため）
+  - Ollama embedder は将来実装予定の旨
 - go test のスモークテスト:
   - projectId="~/tmp/demo" を渡して canonical化されること
   - add_note 2件（groupId="global" と "feature-1"）
   - search(projectId必須, groupId="feature-1") が返る
   - search(projectId必須, groupId=null) でも返る
-  - upsert_global("global.memory.embedder.provider","ollama") → get_global で取れる
-  - upsert_global("global.memory.embedder.model","nomic-embed-text") → get_global で取れる
+  - upsert_global("global.memory.embedder.provider","openai") → get_global で取れる
+  - upsert_global("global.memory.embedder.model","text-embedding-3-small") → get_global で取れる
   - upsert_global("global.memory.groupDefaults", {...}) → get_global で取れる
   - upsert_global("global.project.conventions", "文章") → get_global で取れる
 

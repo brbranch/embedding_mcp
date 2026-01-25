@@ -87,19 +87,16 @@
 
 ---
 
-#### 5. Embedder抽象化とOllama/OpenAI実装 (internal/embedder)
+#### 5. Embedder抽象化とOpenAI実装 (internal/embedder)
 - [ ] Embedder interface定義（Embed(text) -> []float64, GetDimension() -> int）
-- [ ] Ollama embedder実装
-  - endpoint: http://localhost:11434/api/embeddings
-  - request: { "model": "<model>", "prompt": "<text>" }
-  - responseからembeddingを取得（ベクトル長からdim判定）
 - [ ] OpenAI embedder実装
   - embeddings endpoint を net/http で呼び出し
   - apiKey必須（未設定ならJSON-RPC error）
+- [ ] Ollama embedder stub（NotImplemented error返却、将来実装）
 - [ ] local embedder stub（NotImplemented error返却）
 - [ ] 初回埋め込み時のdim取得・設定ファイルへの記録
 
-**完了条件**: `go test ./internal/embedder/...` が成功すること（Ollama起動時にはembedding取得確認）
+**完了条件**: `go test ./internal/embedder/...` が成功すること（OpenAI embedderでembedding取得確認）
 
 ---
 
@@ -198,8 +195,8 @@
 - [ ] search(projectId必須, groupId="feature-1") が返る
 - [ ] search(projectId必須, groupId=null) でも返る
 - [ ] upsert_global/get_global テスト
-  - "global.memory.embedder.provider" = "ollama"
-  - "global.memory.embedder.model" = "nomic-embed-text"
+  - "global.memory.embedder.provider" = "openai"
+  - "global.memory.embedder.model" = "text-embedding-3-small"
   - "global.memory.groupDefaults" = { "featurePrefix": "feature-", "taskPrefix": "task-" }
   - "global.project.conventions" = "文章"
 - [ ] upsert_global で "global." プレフィックスなしはエラーになること
@@ -215,8 +212,9 @@
 - [ ] HTTP起動例: `mcp-memory serve --transport http --host 127.0.0.1 --port 8765`
 - [ ] curl でHTTP JSON-RPCを叩く例
 - [ ] stdio の NDJSON例（1行1JSON、改行エスケープ）
-- [ ] Ollamaが無い/起動してない場合の対処
+- [ ] OpenAI apiKey設定方法（環境変数 or 設定ファイル）
 - [ ] provider切替でnamespaceが変わる説明（embedding dim mismatch回避のため）
+- [ ] Ollama embedderは将来実装予定の旨を記載
 - [ ] Chromaのセットアップ方法（サーバー起動 or embedded mode）
 - [ ] OpenAI apiKeyの注意喚起（設定ファイル保存時のセキュリティ）
 
@@ -285,19 +283,45 @@
 
 ---
 
+### Phase 11: 追加Store/Embedder実装（optional）
+
+#### 15. SQLite VectorStore実装 (internal/store)
+- [ ] SQLite実装（modernc.org/sqlite使用、cgo不要）
+- [ ] cosine類似度による全件スキャン検索
+- [ ] embeddings を SQLite に保存（軽量用途向け）
+- [ ] 5,000件超過時の警告ログ出力
+
+**完了条件**: `go test ./internal/store/...` でSQLite実装のテストが成功すること
+
+---
+
+#### 16. Ollama Embedder実装 (internal/embedder)
+- [ ] Ollama embedder実装
+  - endpoint: http://localhost:11434/api/embeddings
+  - request: { "model": "<model>", "prompt": "<text>" }
+  - responseからembeddingを取得（ベクトル長からdim判定）
+- [ ] Ollamaが無い/起動してない場合のエラーハンドリング
+
+**完了条件**: `go test ./internal/embedder/...` でOllama実装のテストが成功すること（Ollama起動環境で確認）
+
+**注記**: 本フェーズはoptional。Store/Embedderは抽象化されているため、必要に応じて追加実装可能。
+
+---
+
 ## 依存関係
 
 ```
 1 → 2 → 3 → 4, 5 → 6 → 7 → 8, 9 → 10 → 11 → 12 → 13
          ↘     ↗                              ↓
-          並行可能                            14 (optional)
+          並行可能                      14, 15, 16 (optional)
 ```
 
 - Phase 1完了後にPhase 2開始
 - Phase 2内の4（Store）と5（Embedder）は並行実装可能
 - Phase 3以降は順次依存
 - Phase 9はサーバー完成後に実施
-- Phase 10はHTTP transport完成後いつでも実施可能（optional）
+- Phase 10（タスク14）はHTTP transport完成後いつでも実施可能（optional）
+- Phase 11（タスク15, 16）はStore/Embedder interface完成後いつでも実施可能（optional）
 
 ## 仕様参照
 - サーバー仕様: `requirements/embedded_spec.md`
