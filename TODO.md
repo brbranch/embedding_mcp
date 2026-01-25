@@ -223,10 +223,50 @@
 
 ---
 
+### Phase 9: Skill定義
+
+#### 13. Claude Code用Skill定義 (.claude/skills/memory)
+- [ ] SKILL.md作成（embedded_skill_spec.md に基づく）
+- [ ] projectIdの扱い
+  - プロジェクトルートパスをprojectIdとして渡す
+  - レスポンスのcanonical projectIdを以降の呼び出しで使用
+- [ ] フィルタ要件
+  - search: projectId必須、groupId任意（nullはフィルタなし）
+  - list_recent: projectId必須、groupId任意（nullは全groupから取得）
+- [ ] groupIdの決め方
+  - デフォルト: "global"
+  - 機能実装中: "feature-xxx"
+  - タスク単位: "task-xxx"
+- [ ] 検索タイミング定義
+  - 仕様/方針/規約: search(groupId="global") → search(groupId=null)
+  - 機能/タスク進行: search(groupId="feature-x") → search(groupId="global")
+  - 直近状況が必要: list_recent(groupId指定 or null)
+- [ ] 保存タイミング定義
+  - decision/spec/gotcha/glossary → add_note
+  - metadataにconversationId等を入れる（将来の全文ingest拡張用）
+  - persona/共通規約 → upsert_global (key例: global.persona, global.project.conventions)
+- [ ] セッション開始時のglobal keys取得
+  - global.memory.embedder.provider
+  - global.memory.embedder.model
+  - global.memory.groupDefaults
+  - global.project.conventions
+  - 未設定時: サイレントにデフォルト動作を続行（エラーにしない）
+- [ ] globalとconfigの矛盾時
+  - 「方針（global）と実設定（config）がズレている」と明示
+  - どちらを正にするか確認、同期（set_config/upsert_global）を提案
+- [ ] 矛盾検出時のフロー定義
+  - 検索結果が矛盾 → 明示してユーザーに確認
+  - 更新時は memory.update または upsert_global で上書き
+  - 必要に応じて superseded を tags に付与
+
+**完了条件**: `/memory` スキルでClaude Codeからメモリ操作ができること
+
+---
+
 ## 依存関係
 
 ```
-1 → 2 → 3 → 4, 5 → 6 → 7 → 8, 9 → 10 → 11 → 12
+1 → 2 → 3 → 4, 5 → 6 → 7 → 8, 9 → 10 → 11 → 12 → 13
          ↘     ↗
           並行可能
 ```
@@ -234,6 +274,7 @@
 - Phase 1完了後にPhase 2開始
 - Phase 2内の4（Store）と5（Embedder）は並行実装可能
 - Phase 3以降は順次依存
+- Phase 9はサーバー完成後に実施
 
 ## 仕様参照
 - サーバー仕様: `requirements/embedded_spec.md`
