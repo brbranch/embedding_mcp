@@ -84,16 +84,17 @@
 
 # 5. VectorStore 抽象化（設定で切替）
 - Vector store も設定で切り替え可能に抽象化:
-  - store: "sqlite" | "qdrant" | "chroma" | "faiss"
-- 最初のバージョンは "sqlite" を実装する（依存最小・ローカル永続）。
-  - embeddings を SQLite に保存
-  - search は cosine 類似度で全件スキャン（ノート用途で少数を想定）
-  - 後で Qdrant/Chroma/FAISS に差し替え可能なインターフェースにする
-- SQLiteドライバは cgo不要が望ましい（例: modernc.org/sqlite を検討）。難しければ mattn/go-sqlite3 でも可だがREADMEで要件を明記。
+  - store: "chroma" | "sqlite" | "qdrant" | "faiss"
+- 最初のバージョンは "chroma" を実装する（ベクトル検索に最適化・ローカル永続）。
+  - Chroma: https://www.trychroma.com/
+  - Go クライアント: github.com/amikos-tech/chroma-go を使用
+  - embeddings を Chroma に保存し、ベクトル検索を実行
+  - 後で SQLite/Qdrant/FAISS に差し替え可能なインターフェースにする
+- SQLite実装は将来オプションとして追加可能（軽量用途向け）
 
-## SQLite運用上の注意
-- 全件スキャンのため、ノート数が多くなると検索が遅くなる
-- 5,000件を超えた場合はログ警告を出力し、Qdrant等への移行を推奨する
+## Chroma運用上の注意
+- Chromaサーバーをローカルで起動する必要がある（デフォルト: localhost:8000）
+- または embedded mode（インプロセス）での利用も可能
 - 将来的に cleanup / archive 機能を追加可能な設計にしておく
 
 # 6. データモデル（拡張しやすく）

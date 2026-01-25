@@ -72,17 +72,18 @@
 
 ---
 
-#### 4. VectorStore抽象化とSQLite実装 (internal/store)
+#### 4. VectorStore抽象化とChroma実装 (internal/store)
 - [ ] Store interface定義（AddNote, Search, Get, Update, Delete, ListRecent, UpsertGlobal, GetGlobal）
-- [ ] SQLite実装（modernc.org/sqlite使用、cgo不要）
-- [ ] cosine類似度による全件スキャン検索
-- [ ] namespace分離対応
+- [ ] Chroma実装（github.com/amikos-tech/chroma-go使用）
+  - Chromaサーバー接続（デフォルト: localhost:8000）
+  - または embedded mode（インプロセス）対応
+- [ ] ベクトル検索実装
+- [ ] namespace分離対応（Chromaのcollection単位）
 - [ ] 検索フィルタ実装
   - tags: AND検索、空配列/nullはフィルタなし、大小文字区別
   - since/until: UTC ISO8601、境界条件は `since <= createdAt < until`
-- [ ] 5,000件超過時の警告ログ出力（Qdrant等への移行推奨メッセージ）
 
-**完了条件**: `go test ./internal/store/...` が成功し、CRUD+cosine検索+フィルタが動作すること
+**完了条件**: `go test ./internal/store/...` が成功し、CRUD+ベクトル検索+フィルタが動作すること
 
 ---
 
@@ -216,7 +217,7 @@
 - [ ] stdio の NDJSON例（1行1JSON、改行エスケープ）
 - [ ] Ollamaが無い/起動してない場合の対処
 - [ ] provider切替でnamespaceが変わる説明（embedding dim mismatch回避のため）
-- [ ] cgo不要の説明（modernc.org/sqlite使用）
+- [ ] Chromaのセットアップ方法（サーバー起動 or embedded mode）
 - [ ] OpenAI apiKeyの注意喚起（設定ファイル保存時のセキュリティ）
 
 **完了条件**: README.mdが存在し、上記項目が記載されていること
@@ -263,18 +264,40 @@
 
 ---
 
+### Phase 10: クライアントライブラリ（optional）
+
+#### 14. Pythonクライアント (clients/python)
+- [ ] mcp_memory_client.py 作成
+  - MCPMemoryClient クラス（HTTP JSON-RPC呼び出し）
+  - 全9メソッド対応（add_note, search, get, update, list_recent, get_config, set_config, upsert_global, get_global）
+  - 型ヒント付き
+  - 接続設定（base_url, timeout）、エラーハンドリング方針は実装時に決定
+- [ ] LangGraph Tool定義サンプル
+  - @tool デコレータでの定義例
+  - memory_search, memory_add_note 等
+  - 対象LangGraphバージョン、ツール登録方法の詳細は実装時に決定
+- [ ] pyproject.toml / setup.py
+- [ ] 使用例ドキュメント
+
+**完了条件**: LangGraphからmcp-memoryのメソッドを呼び出せること
+
+**注記**: 本フェーズはoptional。LangGraph統合の詳細（バージョン、認証、接続設定、エラー処理方針）は実装着手時に要件を確定する。
+
+---
+
 ## 依存関係
 
 ```
 1 → 2 → 3 → 4, 5 → 6 → 7 → 8, 9 → 10 → 11 → 12 → 13
-         ↘     ↗
-          並行可能
+         ↘     ↗                              ↓
+          並行可能                            14 (optional)
 ```
 
 - Phase 1完了後にPhase 2開始
 - Phase 2内の4（Store）と5（Embedder）は並行実装可能
 - Phase 3以降は順次依存
 - Phase 9はサーバー完成後に実施
+- Phase 10はHTTP transport完成後いつでも実施可能（optional）
 
 ## 仕様参照
 - サーバー仕様: `requirements/embedded_spec.md`
