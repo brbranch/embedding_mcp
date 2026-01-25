@@ -298,12 +298,14 @@ Output:
 
 # 11. テスト / README
 - README:
-  - stdio と HTTP の起動例
-  - curl で HTTP JSON-RPC を叩く例
-  - stdio の NDJSON 例
-  - OpenAI apiKey 設定方法（環境変数 or 設定ファイル）
-  - provider切替で namespace が変わる説明（embedding dim mismatch回避のため）
-  - Ollama embedder は将来実装予定の旨
+  - 各タスク完了時に該当機能の動作確認方法を追記すること
+  - 最終的に以下を含むこと:
+    - stdio と HTTP の起動例
+    - curl で HTTP JSON-RPC を叩く例
+    - stdio の NDJSON 例
+    - OpenAI apiKey 設定方法（環境変数 or 設定ファイル）
+    - provider切替で namespace が変わる説明（embedding dim mismatch回避のため）
+    - Ollama embedder は将来実装予定の旨
 - go test のスモークテスト:
   - projectId="~/tmp/demo" を渡して canonical化されること
   - add_note 2件（groupId="global" と "feature-1"）

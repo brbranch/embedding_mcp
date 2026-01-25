@@ -23,8 +23,11 @@
   internal/transport/stdio/
   internal/transport/http/
   ```
+- [ ] README.md スケルトン作成（プロジェクト概要、ビルド方法）
 
-**完了条件**: `go build ./...` がエラーなく成功すること
+**完了条件**: `go build ./...` がエラーなく成功すること、README.mdにビルド方法が記載されていること
+
+**README更新方針**: 以降の各タスク完了時に、該当機能の動作確認方法をREADMEに追記すること
 
 ---
 
@@ -205,20 +208,23 @@
 
 ---
 
-### Phase 8: ドキュメント
+### Phase 8: ドキュメント最終確認
 
-#### 12. README作成
-- [ ] stdio起動例: `mcp-memory serve`
-- [ ] HTTP起動例: `mcp-memory serve --transport http --host 127.0.0.1 --port 8765`
-- [ ] curl でHTTP JSON-RPCを叩く例
-- [ ] stdio の NDJSON例（1行1JSON、改行エスケープ）
-- [ ] OpenAI apiKey設定方法（環境変数 or 設定ファイル）
-- [ ] provider切替でnamespaceが変わる説明（embedding dim mismatch回避のため）
-- [ ] Ollama embedderは将来実装予定の旨を記載
-- [ ] Chromaのセットアップ方法（サーバー起動 or embedded mode）
-- [ ] OpenAI apiKeyの注意喚起（設定ファイル保存時のセキュリティ）
+#### 12. README最終確認・整理
+- [ ] 以下の項目がREADMEに記載されていることを確認:
+  - stdio起動例: `mcp-memory serve`
+  - HTTP起動例: `mcp-memory serve --transport http --host 127.0.0.1 --port 8765`
+  - curl でHTTP JSON-RPCを叩く例
+  - stdio の NDJSON例（1行1JSON、改行エスケープ）
+  - OpenAI apiKey設定方法（環境変数 or 設定ファイル）
+  - provider切替でnamespaceが変わる説明（embedding dim mismatch回避のため）
+  - Ollama embedderは将来実装予定の旨
+  - Chromaのセットアップ方法（サーバー起動 or embedded mode）
+  - OpenAI apiKeyの注意喚起（設定ファイル保存時のセキュリティ）
+- [ ] 不足項目があれば追記
+- [ ] 全体の構成・読みやすさを確認
 
-**完了条件**: README.mdが存在し、上記項目が記載されていること
+**完了条件**: README.mdが上記項目を全て含み、整理されていること
 
 ---
 
