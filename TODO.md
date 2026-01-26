@@ -265,16 +265,16 @@
 ### Phase 7: 統合テスト
 
 #### 11. E2Eテスト/スモークテスト
-- [ ] projectId="~/tmp/demo" の正規化確認（canonical化されること）
-- [ ] add_note 2件（groupId="global" と "feature-1"）
-- [ ] search(projectId必須, groupId="feature-1") が返る
-- [ ] search(projectId必須, groupId=null) でも返る
-- [ ] upsert_global/get_global テスト
+- [x] projectId="~/tmp/demo" の正規化確認（canonical化されること）
+- [x] add_note 2件（groupId="global" と "feature-1"）
+- [x] search(projectId必須, groupId="feature-1") が返る
+- [x] search(projectId必須, groupId=null) でも返る
+- [x] upsert_global/get_global テスト
   - "global.memory.embedder.provider" = "openai"
   - "global.memory.embedder.model" = "text-embedding-3-small"
   - "global.memory.groupDefaults" = { "featurePrefix": "feature-", "taskPrefix": "task-" }
   - "global.project.conventions" = "文章"
-- [ ] upsert_global で "global." プレフィックスなしはエラーになること
+- [x] upsert_global で "global." プレフィックスなしはエラーになること
 
 **完了条件**: `go test ./... -tags=e2e` が成功すること
 
