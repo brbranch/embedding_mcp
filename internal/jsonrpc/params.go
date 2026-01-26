@@ -84,6 +84,10 @@ type PatchParams struct {
 }
 
 // ToRequest はサービスリクエストに変換
+// 注意: JSON-RPCの「null」と「キー未指定」の区別について
+// - キー未指定 → nilを渡す（変更なし）
+// - null → 空文字列/空mapを渡す（クリア扱い）
+// 将来的にはservice層でnullクリアを明示的にサポートする設計変更が望ましい
 func (p *UpdateParams) ToRequest() (*service.UpdateRequest, error) {
 	patch := service.NotePatch{
 		Text:    p.Patch.Text,
@@ -94,7 +98,7 @@ func (p *UpdateParams) ToRequest() (*service.UpdateRequest, error) {
 	// Title: null か 値 か 未指定 かを判定
 	if len(p.Patch.Title) > 0 {
 		if string(p.Patch.Title) == "null" {
-			// null でクリア
+			// null でクリア（空文字列で表現）
 			empty := ""
 			patch.Title = &empty
 		} else {
@@ -102,13 +106,14 @@ func (p *UpdateParams) ToRequest() (*service.UpdateRequest, error) {
 			if err := json.Unmarshal(p.Patch.Title, &title); err == nil {
 				patch.Title = &title
 			}
+			// 型不正の場合は無視（未指定扱い）
 		}
 	}
 
 	// Source: null か 値 か 未指定 かを判定
 	if len(p.Patch.Source) > 0 {
 		if string(p.Patch.Source) == "null" {
-			// null でクリア
+			// null でクリア（空文字列で表現）
 			empty := ""
 			patch.Source = &empty
 		} else {
@@ -116,13 +121,14 @@ func (p *UpdateParams) ToRequest() (*service.UpdateRequest, error) {
 			if err := json.Unmarshal(p.Patch.Source, &source); err == nil {
 				patch.Source = &source
 			}
+			// 型不正の場合は無視（未指定扱い）
 		}
 	}
 
 	// Metadata: null か 値 か 未指定 かを判定
 	if len(p.Patch.Metadata) > 0 {
 		if string(p.Patch.Metadata) == "null" {
-			// null でクリア
+			// null でクリア（空mapで表現）
 			emptyMap := map[string]any{}
 			patch.Metadata = &emptyMap
 		} else {
@@ -130,6 +136,7 @@ func (p *UpdateParams) ToRequest() (*service.UpdateRequest, error) {
 			if err := json.Unmarshal(p.Patch.Metadata, &metadata); err == nil {
 				patch.Metadata = &metadata
 			}
+			// 型不正の場合は無視（未指定扱い）
 		}
 	}
 

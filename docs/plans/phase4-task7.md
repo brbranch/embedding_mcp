@@ -272,3 +272,17 @@ serviceから返されるエラーをJSON-RPCエラーコードに変換:
 - Handler はtransport非依存。stdio/HTTPどちらからも同じHandlerを使う
 - バッチリクエスト（配列形式）は今回は非対応（将来拡張可能）
 - IDがnullのリクエスト（notification）も今回は非対応
+
+## 既知の制限事項
+
+### nullクリアの実装について
+
+memory.updateのpatchにおいて、title/source/metadataのnullクリアは以下のように実装:
+- JSON-RPCの`null`は空文字列（title/source）または空map（metadata）として渡される
+- service層の`*string`/`*map[string]any`では「nil=変更なし」のため、厳密なnullクリアを表現できない
+- 将来的にはservice層でnullクリアフラグを明示的にサポートする設計変更が望ましい
+
+### 型不正時の動作
+
+- patch内の型が不正な場合（例: titleに数値）は無視される（未指定扱い）
+- エラーにせず寛容に処理する方針としている
