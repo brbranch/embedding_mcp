@@ -1,0 +1,33 @@
+{
+  "phase": 2,
+  "task": 2,
+  "taskName": "データモデル定義 (internal/model)",
+  "currentStep": 11,
+  "status": "completed",
+  "branch": "feature/phase2-task2",
+  "worktree": null,
+  "designPR": null,
+  "implPR": {
+    "number": 3,
+    "url": "https://github.com/brbranch/embedding_mcp/pull/3",
+    "status": "merged"
+  },
+  "startedAt": "2026-01-26T12:00:00Z",
+  "completedAt": "2026-01-26T12:35:00Z",
+  "skippedSteps": [
+    {"step": 8, "reason": "データモデル定義のみ、E2Eテスト対象なし"}
+  ],
+  "history": [
+    {"step": 1, "action": "worktree作成", "completedAt": "2026-01-26T12:00:00Z"},
+    {"step": 2, "action": "実装計画作成", "completedAt": "2026-01-26T12:05:00Z"},
+    {"step": 3, "action": "設計レビューLGTM", "completedAt": "2026-01-26T12:10:00Z"},
+    {"step": 4, "action": "テストコード作成", "completedAt": "2026-01-26T12:15:00Z"},
+    {"step": 5, "action": "テストレビューLGTM", "completedAt": "2026-01-26T12:20:00Z"},
+    {"step": 6, "action": "本実装完了", "completedAt": "2026-01-26T12:25:00Z"},
+    {"step": 7, "action": "エスカレーション不要", "completedAt": "2026-01-26T12:26:00Z"},
+    {"step": 8, "action": "E2Eスキップ（モデル定義のみ）", "completedAt": "2026-01-26T12:27:00Z"},
+    {"step": 9, "action": "README更新", "completedAt": "2026-01-26T12:28:00Z"},
+    {"step": 10, "action": "全体レビューLGTM", "completedAt": "2026-01-26T12:30:00Z"},
+    {"step": 11, "action": "マージ・クリーンアップ完了", "completedAt": "2026-01-26T12:35:00Z"}
+  ]
+}

@@ -106,7 +106,7 @@
 ### Phase 2: コアコンポーネント
 
 #### 2. データモデル定義 (internal/model)
-- [ ] Note構造体
+- [x] Note構造体
   - id (uuid)
   - projectId (canonical)
   - groupId (許容文字: 英数字、`-`、`_`。大小文字区別。"global"は予約値)
