@@ -600,7 +600,8 @@ func TestNoteService_ListRecent_LimitZero(t *testing.T) {
 		Text:      "note 1",
 	})
 
-	// Limit 0 should return empty or all (implementation decides)
+	// Limit 0 means no limit (return all) or return 0 items
+	// Spec: limit=0 should return 0 items (no results requested)
 	limit := 0
 	listReq := &ListRecentRequest{
 		ProjectID: "/test/project",
@@ -612,7 +613,7 @@ func TestNoteService_ListRecent_LimitZero(t *testing.T) {
 		t.Fatalf("ListRecent failed: %v", err)
 	}
 
-	// With limit=0, expect 0 results
+	// With limit=0, expect 0 results (no results explicitly requested)
 	if len(resp.Items) != 0 {
 		t.Errorf("expected 0 items with limit=0, got %d", len(resp.Items))
 	}

@@ -234,7 +234,7 @@ func TestConfigService_SetConfig_EmptyProvider(t *testing.T) {
 	mgr := config.NewManagerWithConfig(cfg)
 	svc := newTestConfigService(mgr)
 
-	// Empty string provider - should not change
+	// Empty string provider - should be ignored (keep original)
 	emptyProvider := ""
 	req := &SetConfigRequest{
 		Embedder: &EmbedderPatch{
@@ -242,23 +242,26 @@ func TestConfigService_SetConfig_EmptyProvider(t *testing.T) {
 		},
 	}
 
-	resp, err := svc.SetConfig(context.Background(), req)
+	_, err := svc.SetConfig(context.Background(), req)
 	if err != nil {
 		t.Fatalf("SetConfig failed: %v", err)
 	}
 
-	// Empty provider should either error or be ignored
-	// Based on behavior, verify the outcome
-	_ = resp
+	// Empty provider should be ignored, original value preserved
+	getResp, _ := svc.GetConfig(context.Background())
+	if getResp.Embedder.Provider != "openai" {
+		t.Errorf("expected provider unchanged when empty, got %s", getResp.Embedder.Provider)
+	}
 }
 
 func TestConfigService_SetConfig_PartialPatch(t *testing.T) {
+	baseURL := "https://api.openai.com"
 	cfg := &model.Config{
 		Embedder: model.EmbedderConfig{
 			Provider: "openai",
 			Model:    "text-embedding-3-small",
 			Dim:      1536,
-			BaseURL:  "https://api.openai.com",
+			BaseURL:  &baseURL,
 		},
 	}
 
@@ -286,8 +289,8 @@ func TestConfigService_SetConfig_PartialPatch(t *testing.T) {
 	if getResp.Embedder.Model != "text-embedding-3-small" {
 		t.Errorf("expected model unchanged, got %s", getResp.Embedder.Model)
 	}
-	if getResp.Embedder.BaseURL != "https://api.openai.com" {
-		t.Errorf("expected baseURL unchanged, got %s", getResp.Embedder.BaseURL)
+	if getResp.Embedder.BaseURL == nil || *getResp.Embedder.BaseURL != "https://api.openai.com" {
+		t.Errorf("expected baseURL unchanged, got %v", getResp.Embedder.BaseURL)
 	}
 }
 
