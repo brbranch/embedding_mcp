@@ -415,6 +415,27 @@ func TestHandle_Search_InvalidSince(t *testing.T) {
 	}
 }
 
+func TestHandle_Search_InvalidUntil(t *testing.T) {
+	h := newTestHandler()
+	h.noteService = &mockNoteService{
+		searchFunc: func(ctx context.Context, req *service.SearchRequest) (*service.SearchResponse, error) {
+			return nil, service.ErrInvalidTimeFormat
+		},
+	}
+	params := map[string]any{
+		"projectId": "/test/project",
+		"query":     "test",
+		"until":     "invalid-time",
+	}
+	req := makeRequest("memory.search", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseErrorResponse(t, result)
+
+	if resp.Error.Code != model.ErrCodeInvalidParams {
+		t.Errorf("expected code %d, got %d", model.ErrCodeInvalidParams, resp.Error.Code)
+	}
+}
+
 // === 5. memory.get テスト ===
 
 func TestHandle_Get_Success(t *testing.T) {
@@ -872,6 +893,63 @@ func TestHandle_GetGlobal_MissingKey(t *testing.T) {
 		"projectId": "/test/project",
 	}
 	req := makeRequest("memory.get_global", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseErrorResponse(t, result)
+
+	if resp.Error.Code != model.ErrCodeInvalidParams {
+		t.Errorf("expected code %d, got %d", model.ErrCodeInvalidParams, resp.Error.Code)
+	}
+}
+
+func TestHandle_GetGlobal_EmptyKey(t *testing.T) {
+	h := newTestHandler()
+	params := map[string]any{
+		"projectId": "/test/project",
+		"key":       "",
+	}
+	req := makeRequest("memory.get_global", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseErrorResponse(t, result)
+
+	if resp.Error.Code != model.ErrCodeInvalidParams {
+		t.Errorf("expected code %d, got %d", model.ErrCodeInvalidParams, resp.Error.Code)
+	}
+}
+
+// === 12. 境界値テスト（空文字） ===
+
+func TestHandle_Get_EmptyId(t *testing.T) {
+	h := newTestHandler()
+	h.noteService = &mockNoteService{
+		getFunc: func(ctx context.Context, id string) (*service.GetResponse, error) {
+			return nil, service.ErrIDRequired
+		},
+	}
+	params := map[string]any{
+		"id": "",
+	}
+	req := makeRequest("memory.get", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseErrorResponse(t, result)
+
+	if resp.Error.Code != model.ErrCodeInvalidParams {
+		t.Errorf("expected code %d, got %d", model.ErrCodeInvalidParams, resp.Error.Code)
+	}
+}
+
+func TestHandle_AddNote_EmptyGroupId(t *testing.T) {
+	h := newTestHandler()
+	h.noteService = &mockNoteService{
+		addNoteFunc: func(ctx context.Context, req *service.AddNoteRequest) (*service.AddNoteResponse, error) {
+			return nil, service.ErrGroupIDRequired
+		},
+	}
+	params := map[string]any{
+		"projectId": "/test/project",
+		"groupId":   "",
+		"text":      "test note",
+	}
+	req := makeRequest("memory.add_note", params)
 	result := h.Handle(context.Background(), req)
 	resp := parseErrorResponse(t, result)
 
