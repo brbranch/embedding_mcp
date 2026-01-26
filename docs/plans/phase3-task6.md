@@ -64,11 +64,12 @@ type AddNoteRequest struct {
 
 **処理:**
 1. ProjectIDを正規化（config.CanonicalizeProjectID）
-2. UUIDを生成
-3. CreatedAtがnullなら現在時刻を設定
-4. Embedder.Embed(text)で埋め込みを生成
-5. Store.AddNote(note, embedding)で保存
-6. namespace（config.GenerateNamespace）と共にIDを返却
+2. GroupIDの文字制約を検証（英数字、`-`、`_`のみ）
+3. UUIDを生成
+4. CreatedAtがnullなら現在時刻を設定
+5. Embedder.Embed(text)で埋め込みを生成
+6. Store.AddNote(note, embedding)で保存
+7. namespace（config.GenerateNamespace）と共にIDを返却
 
 **出力:**
 ```go
@@ -163,10 +164,11 @@ type NotePatch struct {
 ```
 
 **処理:**
-1. Store.Get(id)で既存ノートを取得
+1. Store.Get(id)で既存ノートを取得（見つからなければエラー）
 2. patchを適用
-3. Text変更時のみEmbedder.Embed(newText)
+3. Text変更時のみEmbedder.Embed(newText)、未変更時はembedding=nil
 4. Store.Update(note, embedding)で保存
+   - embedding=nilの場合、Store側で既存embeddingを維持
 
 ### 4.6 ListRecent
 
@@ -184,6 +186,27 @@ type ListRecentRequest struct {
 1. ProjectIDを正規化
 2. Store.ListRecent(opts)で取得
 3. createdAt降順でソート（Store側でソート済み想定）
+
+**出力:**
+```go
+type ListRecentResponse struct {
+    Namespace string
+    Items     []ListRecentItem
+}
+
+type ListRecentItem struct {
+    ID        string
+    ProjectID string
+    GroupID   string
+    Title     *string
+    Text      string
+    Tags      []string
+    Source    *string
+    CreatedAt string
+    Namespace string
+    Metadata  map[string]any
+}
+```
 
 ## 5. ConfigService詳細設計
 
@@ -230,8 +253,13 @@ type EmbedderPatch struct {
 
 **処理:**
 1. config.Manager.Update()で設定を更新
-2. provider/model変更時はnamespaceが変わる（dimリセット→初回埋め込みで再取得）
+2. provider/model変更時:
+   - dimを0にリセット（config.Manager経由）
+   - namespaceが変わる（例: `openai:text-embedding-3-small:0`）
+   - 次回のEmbed呼び出し時にdimが確定し、DimUpdater経由で設定更新
 3. effectiveNamespace（新namespace）を返却
+
+**注意:** store/pathsの変更は再起動が必要（set_configでは不可）
 
 **出力:**
 ```go
@@ -303,10 +331,31 @@ var (
     ErrNoteNotFound       = errors.New("note not found")
     ErrInvalidGlobalKey   = errors.New("key must start with 'global.'")
     ErrProjectIDRequired  = errors.New("projectId is required")
+    ErrGroupIDRequired    = errors.New("groupId is required")
+    ErrInvalidGroupID     = errors.New("groupId contains invalid characters")
     ErrTextRequired       = errors.New("text is required")
     ErrQueryRequired      = errors.New("query is required")
     ErrIDRequired         = errors.New("id is required")
+    ErrInvalidTimeFormat  = errors.New("invalid time format (expected ISO8601 UTC)")
 )
+```
+
+### 7.1 GroupID検証
+
+```go
+// ValidateGroupID はgroupIdの文字制約を検証
+// 許容: 英数字、ハイフン、アンダースコア
+var groupIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+func ValidateGroupID(groupID string) error {
+    if groupID == "" {
+        return ErrGroupIDRequired
+    }
+    if !groupIDRegex.MatchString(groupID) {
+        return ErrInvalidGroupID
+    }
+    return nil
+}
 ```
 
 ## 8. テストケース一覧
@@ -317,19 +366,29 @@ var (
 |------------|------|
 | `TestNoteService_AddNote_Success` | 正常追加 |
 | `TestNoteService_AddNote_ProjectIDRequired` | projectID必須 |
+| `TestNoteService_AddNote_GroupIDRequired` | groupID必須 |
+| `TestNoteService_AddNote_InvalidGroupID` | groupID不正文字 |
 | `TestNoteService_AddNote_TextRequired` | text必須 |
 | `TestNoteService_AddNote_CreatedAtDefault` | createdAt自動設定 |
+| `TestNoteService_AddNote_EmbedderError` | Embedder失敗時エラー伝播 |
 | `TestNoteService_Search_Success` | 正常検索 |
+| `TestNoteService_Search_ProjectIDRequired` | projectID必須 |
+| `TestNoteService_Search_QueryRequired` | query必須 |
 | `TestNoteService_Search_WithGroupID` | groupIDフィルタ |
 | `TestNoteService_Search_WithTags` | tagsフィルタ |
 | `TestNoteService_Search_WithTimeRange` | since/untilフィルタ |
+| `TestNoteService_Search_InvalidTimeFormat` | 不正時刻フォーマット |
 | `TestNoteService_Get_Success` | 正常取得 |
 | `TestNoteService_Get_NotFound` | 存在しないID |
+| `TestNoteService_Get_IDRequired` | id必須 |
 | `TestNoteService_Update_Success` | 正常更新 |
 | `TestNoteService_Update_TextReembed` | text変更時再埋め込み |
+| `TestNoteService_Update_NoTextReembed` | text未変更時は再埋め込みなし |
 | `TestNoteService_Update_NotFound` | 存在しないID |
 | `TestNoteService_ListRecent_Success` | 正常取得 |
 | `TestNoteService_ListRecent_WithGroupID` | groupIDフィルタ |
+| `TestNoteService_ListRecent_WithTags` | tagsフィルタ |
+| `TestNoteService_ListRecent_WithLimit` | limitフィルタ |
 
 ### ConfigServiceテスト
 
@@ -338,6 +397,9 @@ var (
 | `TestConfigService_GetConfig_Success` | 正常取得 |
 | `TestConfigService_SetConfig_Provider` | provider変更 |
 | `TestConfigService_SetConfig_Model` | model変更 |
+| `TestConfigService_SetConfig_BaseURL` | baseURL変更 |
+| `TestConfigService_SetConfig_APIKey` | apiKey変更 |
+| `TestConfigService_SetConfig_DimReset` | provider/model変更時dim=0リセット |
 | `TestConfigService_SetConfig_NamespaceChange` | 変更後namespace確認 |
 
 ### GlobalServiceテスト
@@ -345,10 +407,12 @@ var (
 | テストケース | 説明 |
 |------------|------|
 | `TestGlobalService_UpsertGlobal_Success` | 正常追加 |
+| `TestGlobalService_UpsertGlobal_ProjectIDRequired` | projectID必須 |
 | `TestGlobalService_UpsertGlobal_InvalidKey` | "global."なしでエラー |
 | `TestGlobalService_UpsertGlobal_UpdatedAtDefault` | updatedAt自動設定 |
 | `TestGlobalService_GetGlobal_Found` | 正常取得 |
 | `TestGlobalService_GetGlobal_NotFound` | 見つからない場合 |
+| `TestGlobalService_GetGlobal_ProjectIDRequired` | projectID必須 |
 
 ## 9. テスト方法
 
