@@ -795,6 +795,63 @@ E2Eテストで検証される項目:
 - search（groupIdフィルタ、全検索）
 - upsert_global/get_global（標準キー、エラーケース）
 
+## Pythonクライアント
+
+`clients/python` に Python クライアントライブラリが含まれています。LangGraph/LangChain との統合も可能です。
+
+### インストール
+
+```bash
+# ソースからインストール
+cd clients/python
+pip install -e .
+
+# LangGraph統合が必要な場合
+pip install -e ".[langchain]"
+```
+
+### 使用例
+
+```python
+from mcp_memory_client import MCPMemoryClient
+
+# クライアント作成（デフォルト: http://localhost:8765）
+with MCPMemoryClient() as client:
+    # ノート追加
+    result = client.add_note(
+        project_id="/path/to/project",
+        group_id="global",
+        text="プロジェクトのコーディング規約: TypeScript + ESLint使用",
+        tags=["conventions"],
+    )
+    print(f"Note ID: {result['id']}")
+
+    # 検索
+    results = client.search(
+        project_id="/path/to/project",
+        query="コーディング規約",
+    )
+    for note in results.results:
+        print(f"- {note.text[:50]}... (score: {note.score})")
+```
+
+### LangGraph統合
+
+```python
+from mcp_memory_client.langchain_tools import configure_memory_client, MEMORY_TOOLS
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
+
+# メモリクライアント設定
+configure_memory_client(base_url="http://localhost:8765")
+
+# エージェント作成
+llm = ChatOpenAI(model="gpt-4")
+agent = create_react_agent(llm, tools=MEMORY_TOOLS)
+```
+
+詳細は `clients/python/README.md` を参照してください。
+
 ## 開発状況
 
 コア機能は実装済みです。以下は将来実装予定:
