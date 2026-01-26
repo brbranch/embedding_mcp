@@ -8,16 +8,23 @@ MCP Memory ServerのPythonクライアントライブラリを実装する。HTT
 
 ## 要件トレーサビリティ
 
-| 要件ID | TODO項目 | テストケース | 実装箇所 |
-|--------|----------|--------------|----------|
-| REQ-1 | MCPMemoryClient クラス | TestClient_* | clients/python/src/mcp_memory_client/client.py |
-| REQ-2 | 全9メソッド対応 | TestClient_{method}_* | clients/python/src/mcp_memory_client/client.py |
-| REQ-3 | 型ヒント付き | (型チェッカーで検証) | 全.pyファイル |
-| REQ-4 | 接続設定（base_url, timeout） | TestClient_connection_* | clients/python/src/mcp_memory_client/client.py |
-| REQ-5 | エラーハンドリング | TestClient_error_* | clients/python/src/mcp_memory_client/exceptions.py |
-| REQ-6 | LangGraph Tool定義サンプル | (手動検証) | clients/python/src/mcp_memory_client/langchain_tools.py |
-| REQ-7 | pyproject.toml | (pip install -e . で検証) | clients/python/pyproject.toml |
-| REQ-8 | 使用例ドキュメント | (手動検証) | clients/python/README.md |
+| 要件ID | TODO項目 | テストケース | 実装箇所 | 備考 |
+|--------|----------|--------------|----------|------|
+| REQ-1 | MCPMemoryClient クラス | TestClient_* | clients/python/src/mcp_memory_client/client.py | |
+| REQ-2 | 全9メソッド対応 | TestClient_{method}_* | clients/python/src/mcp_memory_client/client.py | |
+| REQ-3 | 型ヒント付き | (型チェッカーで検証) | 全.pyファイル | |
+| REQ-4 | 接続設定（base_url, timeout） | TestClient_connection_* | clients/python/src/mcp_memory_client/client.py | |
+| REQ-5 | エラーハンドリング | TestClient_error_* | clients/python/src/mcp_memory_client/exceptions.py | 本計画で方針を確定 |
+| REQ-6 | LangGraph Tool定義サンプル | (手動検証) | clients/python/src/mcp_memory_client/langchain_tools.py | LangGraph >= 0.2.0 を前提 |
+| REQ-7 | pyproject.toml | (pip install -e . で検証) | clients/python/pyproject.toml | |
+| REQ-8 | 使用例ドキュメント | (手動検証) | clients/python/README.md | |
+
+### 未確定事項（実装時に最終決定）
+
+| 項目 | 現状の方針 | 実装時に検討すべき点 |
+|------|------------|----------------------|
+| LangGraphバージョン | >= 0.2.0 を前提 | 最新バージョンでのAPI変更に対応 |
+| ツール登録方法 | `@tool` デコレータ使用 | LangGraph側のベストプラクティスに合わせる |
 
 ---
 
@@ -124,7 +131,7 @@ class MCPMemoryClient:
         query: str,
         *,
         group_id: str | None = None,
-        top_k: int | None = None,
+        top_k: int = 5,  # サーバーのデフォルトと同じ
         tags: list[str] | None = None,
         since: datetime | str | None = None,
         until: datetime | str | None = None,
@@ -181,12 +188,12 @@ class MCPMemoryClient:
         group_id: str | None = None,
         limit: int | None = None,
         tags: list[str] | None = None,
-    ) -> SearchResult:
+    ) -> ListRecentResult:
         """
         最近のノート一覧（createdAt降順）
 
         Returns:
-            SearchResult(namespace=str, items=[Note, ...])
+            ListRecentResult(namespace=str, items=[Note, ...])
 
         Raises:
             RPCError: JSON-RPCエラー
@@ -215,6 +222,10 @@ class MCPMemoryClient:
     ) -> dict[str, Any]:
         """
         埋め込み設定を変更
+
+        Note:
+            内部で embedder オブジェクトに変換してJSON-RPC送信:
+            {"embedder": {"provider": ..., "model": ..., ...}}
 
         Returns:
             {"ok": True, "effectiveNamespace": str}
@@ -299,10 +310,14 @@ class Note(BaseModel):
     model_config = {"populate_by_name": True}
 
 class SearchResult(BaseModel):
-    """検索結果"""
+    """検索結果（search用）"""
     namespace: str
     results: list[Note] = Field(default_factory=list)
-    items: list[Note] = Field(default_factory=list)  # list_recent用
+
+class ListRecentResult(BaseModel):
+    """list_recent結果（仕様では items キー）"""
+    namespace: str
+    items: list[Note] = Field(default_factory=list)
 
 class EmbedderConfig(BaseModel):
     """Embedder設定"""
@@ -601,6 +616,10 @@ MEMORY_TOOLS = [
 - `test_search_basic`: 基本検索
 - `test_search_with_filters`: フィルタ付き検索
 - `test_search_empty_result`: 結果なし
+- `test_search_topk_default`: topKデフォルト値（5）
+- `test_search_topk_boundary_zero`: topK=0（エラー期待）
+- `test_search_topk_boundary_large`: topK=1000（大きな値）
+- `test_search_since_until`: since/until境界条件
 
 #### get テスト
 - `test_get_existing`: 存在するID
@@ -615,25 +634,36 @@ MEMORY_TOOLS = [
 - `test_list_recent_default`: デフォルトパラメータ
 - `test_list_recent_with_limit`: limit指定
 - `test_list_recent_with_group`: groupId指定
+- `test_list_recent_with_tags`: tagsフィルタ
+- `test_list_recent_limit_zero`: limit=0（空リスト期待）
+- `test_list_recent_limit_negative`: limit=-1（エラー期待）
 
 #### get_config テスト
 - `test_get_config`: 設定取得
+- `test_get_config_response_format`: レスポンス形式の検証
 
 #### set_config テスト
 - `test_set_config_provider`: provider変更
 - `test_set_config_partial`: 一部のみ変更
+- `test_set_config_invalid_provider`: 不正なprovider値
+- `test_set_config_empty`: 空のパラメータ
 
 #### upsert_global テスト
 - `test_upsert_global_string`: 文字列値
 - `test_upsert_global_object`: オブジェクト値
+- `test_upsert_global_with_updated_at`: updated_at指定
 - `test_upsert_global_invalid_prefix`: 不正なキープレフィックス
 
 #### get_global テスト
 - `test_get_global_existing`: 存在するキー
-- `test_get_global_not_found`: 存在しないキー
+- `test_get_global_not_found`: 存在しないキー（found=false）
+- `test_get_global_not_found_fields`: found=false時のid/value/updated_at確認
 
 #### エラーテスト
 - `test_rpc_error_handling`: JSON-RPCエラーの処理
+- `test_rpc_error_invalid_params`: -32602エラー
+- `test_rpc_error_method_not_found`: -32601エラー
+- `test_rpc_error_api_key_missing`: -32002エラー
 - `test_connection_error`: 接続エラー
 - `test_timeout_error`: タイムアウト
 
@@ -642,7 +672,10 @@ MEMORY_TOOLS = [
 - `test_note_from_dict`: dict→Noteの変換
 - `test_note_alias`: camelCase alias の動作
 - `test_search_result`: SearchResult の構築
+- `test_list_recent_result`: ListRecentResult の構築
 - `test_config_result`: ConfigResult の構築
+- `test_global_value_found_true`: found=true時の構築
+- `test_global_value_found_false`: found=false時の構築
 
 ---
 
@@ -715,6 +748,31 @@ strict = true
 5. **pyproject.toml**: パッケージ設定
 6. **tests/**: テスト実装
 7. **README.md**: 使用例ドキュメント
+
+---
+
+## 設計方針
+
+### パラメータ名変換（snake_case ↔ camelCase）
+
+クライアント側はPython慣習のsnake_case、サーバー側はcamelCaseを使用。
+
+| クライアント (Python) | サーバー (JSON-RPC) |
+|----------------------|---------------------|
+| `project_id` | `projectId` |
+| `group_id` | `groupId` |
+| `top_k` | `topK` |
+| `created_at` | `createdAt` |
+| `updated_at` | `updatedAt` |
+| `base_url` | `baseUrl` |
+| `api_key` | `apiKey` |
+
+**実装方針**: `_call()` メソッド内で params を camelCase に変換して送信。レスポンスは Pydantic の `alias` で自動変換。
+
+### 同期/非同期 設計
+
+- **v0.1.0**: 同期クライアントのみ（`httpx` の同期API使用）
+- **将来**: 非同期クライアント `AsyncMCPMemoryClient` を追加可能（pytest-asyncioは将来の拡張用に依存関係に含む）
 
 ---
 
