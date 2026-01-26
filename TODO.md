@@ -343,7 +343,7 @@
 ### Phase 10: クライアントライブラリ（optional）
 
 #### 14. Pythonクライアント (clients/python)
-- [ ] mcp_memory_client.py 作成
+- [x] mcp_memory_client.py 作成
   - MCPMemoryClient クラス（HTTP JSON-RPC呼び出し）
   - 全9メソッド対応（add_note, search, get, update, list_recent, get_config, set_config, upsert_global, get_global）
   - 型ヒント付き
