@@ -234,11 +234,11 @@ func TestServer_Run_InvalidMethod(t *testing.T) {
 func TestServer_Run_ContextCancel(t *testing.T) {
 	handler := newMockHandler()
 
-	// 無限に読み続けるReader
-	reader := &infiniteReader{}
-	var output bytes.Buffer
-
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// コンテキストキャンセルまでブロックするReader
+	reader := &blockingReader{ctx: ctx}
+	var output bytes.Buffer
 
 	server := New(handler, WithReader(reader), WithWriter(&output))
 
@@ -261,13 +261,15 @@ func TestServer_Run_ContextCancel(t *testing.T) {
 	}
 }
 
-// infiniteReader は無限に読み続けるReader
-type infiniteReader struct{}
+// blockingReader はコンテキストキャンセルまでブロックするReader
+type blockingReader struct {
+	ctx context.Context
+}
 
-func (r *infiniteReader) Read(p []byte) (n int, err error) {
-	// 少し待ってから空を返す（ブロックせずにループを継続させる）
-	time.Sleep(10 * time.Millisecond)
-	return 0, nil
+func (r *blockingReader) Read(p []byte) (n int, err error) {
+	// コンテキストがキャンセルされるまでブロック
+	<-r.ctx.Done()
+	return 0, r.ctx.Err()
 }
 
 // TestServer_Run_EOF はEOFをテスト
@@ -292,8 +294,8 @@ func TestServer_Run_LargeJSON(t *testing.T) {
 	handler := newMockHandler()
 	handler.SetResponse("memory.add_note", map[string]any{"id": "123", "namespace": "test"})
 
-	// 約500KBのテキスト
-	largeText := strings.Repeat("a", 500*1024)
+	// 約900KBのテキスト（1MB境界に近い）
+	largeText := strings.Repeat("a", 900*1024)
 	req := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -328,8 +330,8 @@ func TestServer_Run_LargeJSON(t *testing.T) {
 func TestServer_Run_HugeJSON(t *testing.T) {
 	handler := newMockHandler()
 
-	// 約1.5MBのテキスト（1MB制限を超える）
-	hugeText := strings.Repeat("a", 1500*1024)
+	// 約1.1MBのテキスト（1MB制限をわずかに超える）
+	hugeText := strings.Repeat("a", 1100*1024)
 	req := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -352,6 +354,10 @@ func TestServer_Run_HugeJSON(t *testing.T) {
 	// バッファ制限エラーが発生すること
 	if err == nil {
 		t.Error("expected error for huge JSON, got nil")
+	}
+	// エラーがbufio.ErrTooLong相当であること
+	if err != nil && !strings.Contains(err.Error(), "token too long") {
+		t.Logf("error type: %T, message: %v", err, err)
 	}
 }
 
