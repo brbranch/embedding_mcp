@@ -159,6 +159,99 @@ func TestGlobalService_GetGlobal_ProjectIDRequired(t *testing.T) {
 	}
 }
 
+func TestGlobalService_UpsertGlobal_EmptyKey(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	svc := newTestGlobalService(memStore, "openai:test:3")
+
+	req := &UpsertGlobalRequest{
+		ProjectID: "/test/project",
+		Key:       "", // empty key
+		Value:     "value",
+	}
+
+	_, err := svc.UpsertGlobal(context.Background(), req)
+	// Empty key should fail (doesn't have "global." prefix)
+	if !errors.Is(err, ErrInvalidGlobalKey) {
+		t.Errorf("expected ErrInvalidGlobalKey for empty key, got %v", err)
+	}
+}
+
+func TestGlobalService_UpsertGlobal_Overwrite(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	svc := newTestGlobalService(memStore, "openai:test:3")
+
+	// First upsert
+	_, err := svc.UpsertGlobal(context.Background(), &UpsertGlobalRequest{
+		ProjectID: "/test/project",
+		Key:       "global.test",
+		Value:     "first",
+	})
+	if err != nil {
+		t.Fatalf("first UpsertGlobal failed: %v", err)
+	}
+
+	// Overwrite with second upsert
+	_, err = svc.UpsertGlobal(context.Background(), &UpsertGlobalRequest{
+		ProjectID: "/test/project",
+		Key:       "global.test",
+		Value:     "second",
+	})
+	if err != nil {
+		t.Fatalf("second UpsertGlobal failed: %v", err)
+	}
+
+	// Verify new value
+	resp, err := svc.GetGlobal(context.Background(), "/test/project", "global.test")
+	if err != nil {
+		t.Fatalf("GetGlobal failed: %v", err)
+	}
+
+	if resp.Value != "second" {
+		t.Errorf("expected value 'second', got %v", resp.Value)
+	}
+}
+
+func TestGlobalService_GetGlobal_EmptyKey(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	svc := newTestGlobalService(memStore, "openai:test:3")
+
+	resp, err := svc.GetGlobal(context.Background(), "/test/project", "")
+	if err != nil {
+		// Empty key might return not found or error
+		t.Logf("GetGlobal with empty key returned error: %v", err)
+		return
+	}
+
+	// If no error, should not be found
+	if resp.Found {
+		t.Error("expected found to be false for empty key")
+	}
+}
+
+func TestGlobalService_UpsertGlobal_StandardKeys(t *testing.T) {
+	// Test standard keys defined in spec
+	standardKeys := []string{
+		"global.memory.embedder.provider",
+		"global.memory.embedder.model",
+		"global.memory.groupDefaults",
+		"global.project.conventions",
+	}
+
+	memStore := store.NewMemoryStore()
+	svc := newTestGlobalService(memStore, "openai:test:3")
+
+	for _, key := range standardKeys {
+		_, err := svc.UpsertGlobal(context.Background(), &UpsertGlobalRequest{
+			ProjectID: "/test/project",
+			Key:       key,
+			Value:     "test-value",
+		})
+		if err != nil {
+			t.Errorf("UpsertGlobal failed for key %s: %v", key, err)
+		}
+	}
+}
+
 // Stub implementation for tests to compile
 type globalService struct {
 	store     store.Store

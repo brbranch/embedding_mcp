@@ -573,6 +573,205 @@ func TestNoteService_ListRecent_WithLimit(t *testing.T) {
 	}
 }
 
+func TestNoteService_ListRecent_ProjectIDRequired(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	emb := &mockEmbedder{dim: 3}
+	svc := newTestNoteService(emb, memStore, "openai:test:3")
+
+	listReq := &ListRecentRequest{
+		// ProjectID missing
+	}
+
+	_, err := svc.ListRecent(context.Background(), listReq)
+	if !errors.Is(err, ErrProjectIDRequired) {
+		t.Errorf("expected ErrProjectIDRequired, got %v", err)
+	}
+}
+
+func TestNoteService_ListRecent_LimitZero(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	emb := &mockEmbedder{dim: 3}
+	svc := newTestNoteService(emb, memStore, "openai:test:3")
+
+	// Add notes
+	_, _ = svc.AddNote(context.Background(), &AddNoteRequest{
+		ProjectID: "/test/project",
+		GroupID:   "global",
+		Text:      "note 1",
+	})
+
+	// Limit 0 should return empty or all (implementation decides)
+	limit := 0
+	listReq := &ListRecentRequest{
+		ProjectID: "/test/project",
+		Limit:     &limit,
+	}
+
+	resp, err := svc.ListRecent(context.Background(), listReq)
+	if err != nil {
+		t.Fatalf("ListRecent failed: %v", err)
+	}
+
+	// With limit=0, expect 0 results
+	if len(resp.Items) != 0 {
+		t.Errorf("expected 0 items with limit=0, got %d", len(resp.Items))
+	}
+}
+
+func TestNoteService_Update_IDRequired(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	emb := &mockEmbedder{dim: 3}
+	svc := newTestNoteService(emb, memStore, "openai:test:3")
+
+	newTitle := "title"
+	updateReq := &UpdateRequest{
+		ID: "", // empty ID
+		Patch: NotePatch{
+			Title: &newTitle,
+		},
+	}
+
+	err := svc.Update(context.Background(), updateReq)
+	if !errors.Is(err, ErrIDRequired) {
+		t.Errorf("expected ErrIDRequired, got %v", err)
+	}
+}
+
+func TestNoteService_Update_EmptyPatch(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	emb := &mockEmbedder{dim: 3}
+	svc := newTestNoteService(emb, memStore, "openai:test:3")
+
+	// Add a note first
+	addReq := &AddNoteRequest{
+		ProjectID: "/test/project",
+		GroupID:   "global",
+		Text:      "original text",
+	}
+	addResp, _ := svc.AddNote(context.Background(), addReq)
+
+	// Update with empty patch - should be no-op
+	updateReq := &UpdateRequest{
+		ID:    addResp.ID,
+		Patch: NotePatch{}, // all nil
+	}
+
+	err := svc.Update(context.Background(), updateReq)
+	if err != nil {
+		t.Fatalf("Update with empty patch failed: %v", err)
+	}
+
+	// Verify no change
+	note, _ := svc.Get(context.Background(), addResp.ID)
+	if note.Text != "original text" {
+		t.Error("text should not have changed")
+	}
+}
+
+func TestNoteService_Search_DefaultTopK(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	emb := &mockEmbedder{dim: 3}
+	svc := newTestNoteService(emb, memStore, "openai:test:3")
+
+	// Add 10 notes
+	for i := 0; i < 10; i++ {
+		_, _ = svc.AddNote(context.Background(), &AddNoteRequest{
+			ProjectID: "/test/project",
+			GroupID:   "global",
+			Text:      "test note",
+		})
+	}
+
+	// Search without TopK - should default to 5
+	searchReq := &SearchRequest{
+		ProjectID: "/test/project",
+		Query:     "test",
+		// TopK not set
+	}
+
+	resp, err := svc.Search(context.Background(), searchReq)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	// Default TopK is 5
+	if len(resp.Results) > 5 {
+		t.Errorf("expected max 5 results (default TopK), got %d", len(resp.Results))
+	}
+}
+
+func TestNoteService_Search_WithTopK(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	emb := &mockEmbedder{dim: 3}
+	svc := newTestNoteService(emb, memStore, "openai:test:3")
+
+	// Add 10 notes
+	for i := 0; i < 10; i++ {
+		_, _ = svc.AddNote(context.Background(), &AddNoteRequest{
+			ProjectID: "/test/project",
+			GroupID:   "global",
+			Text:      "test note",
+		})
+	}
+
+	// Search with TopK=3
+	topK := 3
+	searchReq := &SearchRequest{
+		ProjectID: "/test/project",
+		Query:     "test",
+		TopK:      &topK,
+	}
+
+	resp, err := svc.Search(context.Background(), searchReq)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(resp.Results) > 3 {
+		t.Errorf("expected max 3 results, got %d", len(resp.Results))
+	}
+}
+
+func TestNoteService_AddNote_WithAllFields(t *testing.T) {
+	memStore := store.NewMemoryStore()
+	emb := &mockEmbedder{dim: 3}
+	svc := newTestNoteService(emb, memStore, "openai:test:3")
+
+	title := "Test Title"
+	source := "test-source"
+	createdAt := "2025-01-26T12:00:00Z"
+	req := &AddNoteRequest{
+		ProjectID: "/test/project",
+		GroupID:   "feature-1",
+		Title:     &title,
+		Text:      "test note with all fields",
+		Tags:      []string{"tag1", "tag2"},
+		Source:    &source,
+		CreatedAt: &createdAt,
+		Metadata:  map[string]any{"key": "value"},
+	}
+
+	resp, err := svc.AddNote(context.Background(), req)
+	if err != nil {
+		t.Fatalf("AddNote failed: %v", err)
+	}
+
+	// Verify all fields were saved
+	note, _ := svc.Get(context.Background(), resp.ID)
+	if note.Title == nil || *note.Title != "Test Title" {
+		t.Error("title not saved correctly")
+	}
+	if note.Source == nil || *note.Source != "test-source" {
+		t.Error("source not saved correctly")
+	}
+	if len(note.Tags) != 2 {
+		t.Errorf("expected 2 tags, got %d", len(note.Tags))
+	}
+	if note.CreatedAt != "2025-01-26T12:00:00Z" {
+		t.Errorf("createdAt not saved correctly: %s", note.CreatedAt)
+	}
+}
+
 // Stub implementation for tests to compile
 type noteService struct {
 	embedder  embedder.Embedder
