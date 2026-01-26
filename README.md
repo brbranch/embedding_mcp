@@ -321,7 +321,68 @@ go test ./internal/transport/stdio/...
 
 ### HTTP Transport
 
-（実装予定）
+HTTP経由でJSON-RPC 2.0を処理。`POST /rpc` エンドポイントを提供。
+
+**特徴:**
+- エンドポイント: `POST /rpc`
+- Content-Type: `application/json`
+- CORS設定可能（デフォルトは無効）
+- contextキャンセルで graceful shutdown
+
+**設定:**
+
+```go
+type Config struct {
+    Addr        string   // listen address (例: "127.0.0.1:8765")
+    CORSOrigins []string // 許可するオリジンリスト、空ならCORS無効
+}
+```
+
+**使用例:**
+
+```go
+handler := jsonrpc.New(noteService, configService, globalService)
+server := http.New(handler, http.Config{
+    Addr: "127.0.0.1:8765",
+})
+err := server.Run(ctx)
+```
+
+**テスト実行:**
+
+```bash
+go test ./internal/transport/http/...
+```
+
+**動作確認（CLI完成後）:**
+
+```bash
+# HTTPサーバー起動
+./mcp-memory serve --transport http --port 8765
+
+# 別ターミナルでJSON-RPC呼び出し
+curl -X POST http://localhost:8765/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}'
+
+# レスポンス例
+# {"jsonrpc":"2.0","id":1,"result":{"transportDefaults":{"defaultTransport":"stdio"},...}}
+```
+
+**CORS設定例:**
+
+```go
+server := http.New(handler, http.Config{
+    Addr:        "127.0.0.1:8765",
+    CORSOrigins: []string{"http://localhost:3000", "http://example.com"},
+})
+```
+
+CORS有効時のレスポンスヘッダー:
+- `Access-Control-Allow-Origin`: リクエストのOrigin（許可リストに含まれる場合）
+- `Access-Control-Allow-Methods`: POST, OPTIONS
+- `Access-Control-Allow-Headers`: Content-Type
+- `Vary: Origin`: キャッシュ安全のため
 
 ## 開発状況
 
