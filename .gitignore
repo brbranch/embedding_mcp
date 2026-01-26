@@ -5,6 +5,7 @@ mcp-memory
 *.out
 *.coverprofile
 coverage.*
+.claude/settings.json
 
 # Dependency directory (if using vendor)
 vendor/
