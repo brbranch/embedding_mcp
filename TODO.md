@@ -163,13 +163,13 @@
 ---
 
 #### 5. Embedder抽象化とOpenAI実装 (internal/embedder)
-- [ ] Embedder interface定義（Embed(text) -> []float64, GetDimension() -> int）
-- [ ] OpenAI embedder実装
+- [x] Embedder interface定義（Embed(text) -> []float32, GetDimension() -> int）
+- [x] OpenAI embedder実装
   - embeddings endpoint を net/http で呼び出し
-  - apiKey必須（未設定ならJSON-RPC error）
-- [ ] Ollama embedder stub（NotImplemented error返却、将来実装）
-- [ ] local embedder stub（NotImplemented error返却）
-- [ ] 初回埋め込み時のdim取得・設定ファイルへの記録
+  - apiKey必須（未設定ならErrAPIKeyRequired）
+- [x] Ollama embedder stub（NotImplemented error返却、将来実装）
+- [x] local embedder stub（NotImplemented error返却）
+- [x] 初回埋め込み時のdim取得・DimUpdaterコールバック
 
 **完了条件**: `go test ./internal/embedder/...` が成功すること（OpenAI embedderでembedding取得確認）
 
