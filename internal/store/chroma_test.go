@@ -20,7 +20,6 @@ const (
 
 // TestChromaStore_AddNote はノート追加をテスト
 func TestChromaStore_AddNote(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -40,7 +39,6 @@ func TestChromaStore_AddNote(t *testing.T) {
 
 // TestChromaStore_AddNote_AllFields は全フィールド含むノート追加をテスト
 func TestChromaStore_AddNote_AllFields(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -68,7 +66,6 @@ func TestChromaStore_AddNote_AllFields(t *testing.T) {
 
 // TestChromaStore_Get はID指定でノート取得をテスト
 func TestChromaStore_Get(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -88,7 +85,6 @@ func TestChromaStore_Get(t *testing.T) {
 
 // TestChromaStore_Get_NotFound は存在しないIDでErrNotFoundを返すことをテスト
 func TestChromaStore_Get_NotFound(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -100,7 +96,6 @@ func TestChromaStore_Get_NotFound(t *testing.T) {
 
 // TestChromaStore_Update はノート更新をテスト
 func TestChromaStore_Update(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -128,7 +123,6 @@ func TestChromaStore_Update(t *testing.T) {
 
 // TestChromaStore_Update_MetadataOnly はmetadataのみ更新をテスト
 func TestChromaStore_Update_MetadataOnly(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -149,14 +143,28 @@ func TestChromaStore_Update_MetadataOnly(t *testing.T) {
 	// 検証
 	retrieved, err := store.Get(ctx, note.ID)
 	assertNoError(t, err)
-	if retrieved.Metadata["version"] != 2 {
-		t.Errorf("Metadata version mismatch: expected=2, actual=%v", retrieved.Metadata["version"])
+	// JSONを通すとintがfloat64になるため、型に寛容に比較
+	version, ok := retrieved.Metadata["version"]
+	if !ok {
+		t.Error("Metadata version should exist")
+	}
+	// versionが2または2.0であればOK
+	switch v := version.(type) {
+	case int:
+		if v != 2 {
+			t.Errorf("Metadata version mismatch: expected=2, actual=%v", v)
+		}
+	case float64:
+		if v != 2.0 {
+			t.Errorf("Metadata version mismatch: expected=2.0, actual=%v", v)
+		}
+	default:
+		t.Errorf("Metadata version has unexpected type: %T", v)
 	}
 }
 
 // TestChromaStore_Delete はノート削除をテスト
 func TestChromaStore_Delete(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -179,7 +187,6 @@ func TestChromaStore_Delete(t *testing.T) {
 
 // TestChromaStore_Search_Basic は基本的なベクトル検索をテスト
 func TestChromaStore_Search_Basic(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -225,7 +232,6 @@ func TestChromaStore_Search_Basic(t *testing.T) {
 
 // TestChromaStore_Search_ProjectIDFilter はprojectIDでフィルタをテスト
 func TestChromaStore_Search_ProjectIDFilter(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -258,7 +264,6 @@ func TestChromaStore_Search_ProjectIDFilter(t *testing.T) {
 
 // TestChromaStore_Search_GroupIDFilter はgroupIDでフィルタをテスト
 func TestChromaStore_Search_GroupIDFilter(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -292,7 +297,6 @@ func TestChromaStore_Search_GroupIDFilter(t *testing.T) {
 
 // TestChromaStore_Search_GroupIDNil はgroupID=nilで全group検索をテスト
 func TestChromaStore_Search_GroupIDNil(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -323,7 +327,6 @@ func TestChromaStore_Search_GroupIDNil(t *testing.T) {
 
 // TestChromaStore_Search_TopK はTopK指定で件数制限をテスト
 func TestChromaStore_Search_TopK(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -353,7 +356,6 @@ func TestChromaStore_Search_TopK(t *testing.T) {
 
 // TestChromaStore_Search_ScoreOrder はスコア降順でソートをテスト
 func TestChromaStore_Search_ScoreOrder(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -389,7 +391,6 @@ func TestChromaStore_Search_ScoreOrder(t *testing.T) {
 
 // TestChromaStore_Search_TagsFilter_AND はtags AND検索をテスト
 func TestChromaStore_Search_TagsFilter_AND(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -428,7 +429,6 @@ func TestChromaStore_Search_TagsFilter_AND(t *testing.T) {
 
 // TestChromaStore_Search_TagsFilter_Empty は空配列はフィルタなしをテスト
 func TestChromaStore_Search_TagsFilter_Empty(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -459,7 +459,6 @@ func TestChromaStore_Search_TagsFilter_Empty(t *testing.T) {
 
 // TestChromaStore_Search_TagsNil はtags=nilでフィルタなしをテスト
 func TestChromaStore_Search_TagsNil(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -490,7 +489,6 @@ func TestChromaStore_Search_TagsNil(t *testing.T) {
 
 // TestChromaStore_Search_TagsFilter_CaseSensitive は大小文字区別をテスト
 func TestChromaStore_Search_TagsFilter_CaseSensitive(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -524,7 +522,6 @@ func TestChromaStore_Search_TagsFilter_CaseSensitive(t *testing.T) {
 
 // TestChromaStore_Search_SinceFilter はsince <= createdAtをテスト
 func TestChromaStore_Search_SinceFilter(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -569,7 +566,6 @@ func TestChromaStore_Search_SinceFilter(t *testing.T) {
 
 // TestChromaStore_Search_UntilFilter はcreatedAt < untilをテスト
 func TestChromaStore_Search_UntilFilter(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -610,7 +606,6 @@ func TestChromaStore_Search_UntilFilter(t *testing.T) {
 
 // TestChromaStore_Search_BoundaryCondition は境界条件テスト
 func TestChromaStore_Search_BoundaryCondition(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -650,7 +645,6 @@ func TestChromaStore_Search_BoundaryCondition(t *testing.T) {
 
 // TestChromaStore_ListRecent_Basic はcreatedAt降順で取得をテスト
 func TestChromaStore_ListRecent_Basic(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -693,7 +687,6 @@ func TestChromaStore_ListRecent_Basic(t *testing.T) {
 
 // TestChromaStore_ListRecent_Limit はLimit指定で件数制限をテスト
 func TestChromaStore_ListRecent_Limit(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -721,7 +714,6 @@ func TestChromaStore_ListRecent_Limit(t *testing.T) {
 
 // TestChromaStore_ListRecent_Filters はフィルタ適用をテスト
 func TestChromaStore_ListRecent_Filters(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -760,7 +752,6 @@ func TestChromaStore_ListRecent_Filters(t *testing.T) {
 
 // TestChromaStore_ListRecent_GroupIDNil はgroupID=nilで全group取得をテスト
 func TestChromaStore_ListRecent_GroupIDNil(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -791,7 +782,6 @@ func TestChromaStore_ListRecent_GroupIDNil(t *testing.T) {
 
 // TestChromaStore_UpsertGlobal_Insert は新規追加をテスト
 func TestChromaStore_UpsertGlobal_Insert(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -815,7 +805,6 @@ func TestChromaStore_UpsertGlobal_Insert(t *testing.T) {
 
 // TestChromaStore_UpsertGlobal_Update は更新をテスト
 func TestChromaStore_UpsertGlobal_Update(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -844,7 +833,6 @@ func TestChromaStore_UpsertGlobal_Update(t *testing.T) {
 
 // TestChromaStore_GetGlobal_Found は取得成功をテスト
 func TestChromaStore_GetGlobal_Found(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -874,7 +862,6 @@ func TestChromaStore_GetGlobal_Found(t *testing.T) {
 
 // TestChromaStore_GetGlobal_NotFound はfound=falseをテスト
 func TestChromaStore_GetGlobal_NotFound(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 	store := setupTestStore(t)
@@ -889,7 +876,6 @@ func TestChromaStore_GetGlobal_NotFound(t *testing.T) {
 
 // TestChromaStore_Namespace_Isolation は異なるnamespaceは別コレクションをテスト
 func TestChromaStore_Namespace_Isolation(t *testing.T) {
-	t.Skip("TODO: implement after ChromaStore is available")
 
 	ctx := setupTestContext()
 
@@ -924,15 +910,21 @@ func TestChromaStore_Namespace_Isolation(t *testing.T) {
 // setupTestStore はテスト用のChromaStoreを初期化
 func setupTestStore(t *testing.T) Store {
 	t.Helper()
-	// TODO: implement using mock or in-memory store
-	// For now, return nil to make it compile
-	return nil
+	return setupTestStoreWithNamespace(t, testNamespace)
 }
 
 // setupTestStoreWithNamespace はnamespace指定でテスト用のChromaStoreを初期化
 func setupTestStoreWithNamespace(t *testing.T, namespace string) Store {
 	t.Helper()
-	// TODO: implement using mock or in-memory store
-	// For now, return nil to make it compile
-	return nil
+
+	// MemoryStoreを使用（Chromaサーバー不要）
+	store := NewMemoryStore()
+	ctx := setupTestContext()
+
+	err := store.Initialize(ctx, namespace)
+	if err != nil {
+		t.Fatalf("Failed to initialize store: %v", err)
+	}
+
+	return store
 }

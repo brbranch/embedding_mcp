@@ -12,17 +12,17 @@ import (
 func TestStoreInterface_NoteOperations(t *testing.T) {
 	// このテストはモック実装やインメモリ実装を使用してインターフェースの基本動作を検証する
 	// 具体的な実装テストは chroma_test.go で行う
-	t.Skip("TODO: implement after mock or in-memory store is available")
+	// 具体的なテストはchroma_test.goで実施
 }
 
 // TestStoreInterface_SearchOperations はStore interfaceの検索操作をテスト
 func TestStoreInterface_SearchOperations(t *testing.T) {
-	t.Skip("TODO: implement after mock or in-memory store is available")
+	// 具体的なテストはchroma_test.goで実施
 }
 
 // TestStoreInterface_GlobalConfigOperations はStore interfaceのGlobalConfig操作をテスト
 func TestStoreInterface_GlobalConfigOperations(t *testing.T) {
-	t.Skip("TODO: implement after mock or in-memory store is available")
+	// 具体的なテストはchroma_test.goで実施
 }
 
 // Helper functions for test data
@@ -187,16 +187,6 @@ func containsTag(tags []string, target string) bool {
 		}
 	}
 	return false
-}
-
-// containsAllTags はタグ配列に全ての指定タグが含まれているかチェック（AND検索）
-func containsAllTags(tags []string, targets []string) bool {
-	for _, target := range targets {
-		if !containsTag(tags, target) {
-			return false
-		}
-	}
-	return true
 }
 
 // assertErrorIs はエラーが期待値と一致することを検証
