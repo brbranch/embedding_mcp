@@ -1,0 +1,1 @@
+"""MCP Memory Client tests."""

@@ -27,3 +27,16 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+clients/python/.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+clients/python/.venv/
