@@ -260,10 +260,9 @@ git push origin main
 ### 11-7. GitHub Release 作成
 
 ```bash
-# タグ名: v{phase}.{task}.0 （例: v1.1.0）
-# または Phase0 の場合: v0.{task}.0
+# タグ名: v0.{phase}.{task} （例: v0.1.1）
 
-gh release create v{phase}.{task}.0 \
+gh release create v0.{phase}.{task} \
   --title "Phase {N} Task {M}: {タスク名}" \
   --notes "## 変更内容
 

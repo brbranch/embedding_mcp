@@ -272,7 +272,7 @@ mcp-memory serve --transport http --host 127.0.0.1 --port 8765
 ./mcp-memory serve --config /path/to/config.json
 ```
 
-### ワンショット検索コマンド（v9.13.0～）
+### ワンショット検索コマンド（v0.9.13～）
 
 MCPサーバーを起動せずに、コマンドラインから直接検索を実行できます。SessionStart Hookとの連携に最適です。
 

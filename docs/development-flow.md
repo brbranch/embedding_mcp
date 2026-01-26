@@ -258,8 +258,8 @@ TODO内のタスク（Phase/タスク番号）ごとにworktreeを作成。
 
 **タグ命名規則**:
 ```
-v{major}.{minor}.{patch}-phase{N}-task{M}
-例: v0.1.0-phase1-task1
+v0.{phase}.{task}
+例: v0.1.1 (Phase 1 Task 1)
 ```
 
 ## PR運用ルール

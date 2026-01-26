@@ -1,0 +1,28 @@
+# Binary
+mcp-memory
+
+# Test coverage
+*.out
+*.coverprofile
+coverage.*
+
+# Dependency directory (if using vendor)
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
