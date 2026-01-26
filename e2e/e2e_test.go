@@ -24,15 +24,35 @@ func TestE2E_ProjectID_TildeExpansion(t *testing.T) {
 		t.Error("expected Namespace to be non-empty")
 	}
 
-	// NOTE: 現在の実装ではprojectID正規化が未実装の可能性があるため、
-	// このテストはcanonicalProjectIDフィールドの存在を確認するのみ
-	// 実装が完了したら以下のアサーションを有効化すること
-	// if !strings.HasPrefix(resp.CanonicalProjectID, "/") {
-	//     t.Errorf("projectID should be absolute path, got: %s", resp.CanonicalProjectID)
-	// }
-	// if strings.Contains(resp.CanonicalProjectID, "~") {
-	//     t.Errorf("~ should be expanded, got: %s", resp.CanonicalProjectID)
-	// }
+	// canonicalProjectIDが返されること
+	if resp.CanonicalProjectID == "" {
+		t.Error("expected CanonicalProjectID to be non-empty")
+	}
+
+	// 環境依存を考慮した緩い検証:
+	// - 絶対パスであること（先頭が"/"）
+	// - "~"が展開されていること（"~"を含まない）
+	if !strings.HasPrefix(resp.CanonicalProjectID, "/") {
+		t.Errorf("projectID should be absolute path, got: %s", resp.CanonicalProjectID)
+	}
+	if strings.Contains(resp.CanonicalProjectID, "~") {
+		t.Errorf("~ should be expanded, got: %s", resp.CanonicalProjectID)
+	}
+}
+
+// TestE2E_ProjectID_Consistency は同じパスが常に同じcanonicalパスになることを検証
+func TestE2E_ProjectID_Consistency(t *testing.T) {
+	h := setupTestHandler(t)
+
+	// 同じパスで2回ノート追加
+	resp1 := callAddNote(t, h, "~/tmp/demo", "global", "test note 1")
+	resp2 := callAddNote(t, h, "~/tmp/demo", "global", "test note 2")
+
+	// 両方とも同じcanonicalProjectIDが返ること
+	if resp1.CanonicalProjectID != resp2.CanonicalProjectID {
+		t.Errorf("expected same canonicalProjectID, got: %s vs %s",
+			resp1.CanonicalProjectID, resp2.CanonicalProjectID)
+	}
 }
 
 // TestE2E_AddNote_GlobalGroup はglobal groupへのノート追加を検証
