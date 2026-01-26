@@ -173,7 +173,7 @@ import "fmt"
 
 // GenerateNamespace はembedder設定からnamespaceを生成する
 // 形式: "{provider}:{model}:{dim}"
-// dimが0（未設定）の場合は "pending" を使用
+// dimが0（未設定）の場合も0をそのまま使用（仕様準拠）
 func GenerateNamespace(provider, model string, dim int) string
 
 // ParseNamespace はnamespaceをprovider, model, dimに分解する
@@ -185,11 +185,7 @@ func ParseNamespace(namespace string) (provider, model string, dim int, err erro
 
 ```go
 func GenerateNamespace(provider, modelName string, dim int) string {
-    dimStr := "pending"
-    if dim > 0 {
-        dimStr = fmt.Sprintf("%d", dim)
-    }
-    return fmt.Sprintf("%s:%s:%s", provider, modelName, dimStr)
+    return fmt.Sprintf("%s:%s:%d", provider, modelName, dim)
 }
 ```
 
@@ -299,11 +295,11 @@ func GetOpenAIAPIKey(config *model.Config) string {
 | テストケース | 説明 |
 |------------|------|
 | `TestGenerateNamespace_WithDim` | `openai:text-embedding-3-small:1536` |
-| `TestGenerateNamespace_DimZero` | `openai:text-embedding-3-small:pending` |
+| `TestGenerateNamespace_DimZero` | `openai:text-embedding-3-small:0` |
 | `TestGenerateNamespace_Ollama` | `ollama:nomic-embed-text:768` |
 | `TestParseNamespace_Valid` | 正しく分解される |
 | `TestParseNamespace_InvalidFormat` | 不正形式でエラー |
-| `TestParseNamespace_Pending` | `:pending` でdim=0 |
+| `TestParseNamespace_DimZero` | dim=0でも正常にパース |
 
 ### 5.3 設定管理テスト (manager_test.go)
 
@@ -317,6 +313,7 @@ func GetOpenAIAPIKey(config *model.Config) string {
 | `TestManager_Save` | 正しく保存される |
 | `TestManager_SaveAndLoad` | 保存後読み込みで同一 |
 | `TestManager_UpdateEmbedder` | embedder設定のみ更新 |
+| `TestManager_UpdateEmbedder_StorePathsUnchanged` | store/pathsが変更されないことを検証 |
 | `TestManager_UpdateDim` | dim更新が反映される |
 | `TestDefaultConfig` | デフォルト値が正しい |
 
