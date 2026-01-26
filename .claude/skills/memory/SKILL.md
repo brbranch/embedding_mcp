@@ -75,11 +75,12 @@ git rev-parse --show-toplevel 2>/dev/null || pwd
 1. **プロジェクトルートを検出**
    - git rootまたはカレントディレクトリ
 
-2. **global keysを取得**（未設定でもエラーにしない）
+2. **global keysを取得**（未設定でもエラーにしない、**サイレントに続行**）
    - `global.memory.embedder.provider` - 推奨embedder provider
    - `global.memory.embedder.model` - 推奨embedder model
    - `global.memory.groupDefaults` - groupId命名ルール
    - `global.project.conventions` - プロジェクト規約
+   - **重要**: 未設定時はユーザーに確認せず、デフォルト動作を続行
 
 3. **実稼働設定を取得**
    - `memory.get_config` で実際の設定を取得
@@ -115,11 +116,11 @@ git rev-parse --show-toplevel 2>/dev/null || pwd
 
 ### パターンD: 特定ノートを直接取得
 
-- `memory.get(projectId, id)` でIDを指定して取得
+- `memory.get(id)` でIDを指定して取得（※projectId不要、idのみ）
 
 ### 検索フィルタオプション
 
-- `tags`: タグでフィルタ（AND検索、空配列/nullはフィルタなし）
+- `tags`: タグでフィルタ（AND検索、空配列/nullはフィルタなし、**大小文字区別**）
 - `since`/`until`: 期間でフィルタ（UTC ISO8601、`since <= createdAt < until`）
 
 ---
