@@ -242,7 +242,40 @@ internal/store
   └── github.com/amikos-tech/chroma-go
 ```
 
-## 7. 完了条件
+## 7. 責務分離（設計レビュー対応）
+
+### 7.1 Store層 vs Service層
+
+| 責務 | 担当 | 説明 |
+|------|------|------|
+| ProjectID必須チェック | Service層 | JSON-RPC errorとして返す |
+| GlobalConfig key検証 | Service層 | "global."プレフィックス必須 |
+| 再埋め込み判断 | Service層 | text変更時のみ再埋め込み |
+| embedding生成 | Embedder | Store層はembeddingを受け取るのみ |
+| TopK/Limitデフォルト | Service層 | Optionsのデフォルト値を設定 |
+
+### 7.2 groupID=nil時の動作
+
+- **Search**: groupIDフィルタを適用しない（全group対象）
+- **ListRecent**: groupIDフィルタを適用しない（全group対象）
+- Chroma側ではWhereフィルタにgroupIDを含めない
+
+### 7.3 追加テストケース
+
+| テストケース | 説明 |
+|------------|------|
+| `TestChromaStore_Search_GroupIDNil` | groupID=nilで全group検索 |
+| `TestChromaStore_ListRecent_GroupIDNil` | groupID=nilで全group取得 |
+| `TestChromaStore_Search_TagsNil` | tags=nilでフィルタなし |
+| `TestChromaStore_Search_TagsEmpty` | tags=空配列でフィルタなし |
+
+### 7.4 Chroma API仕様
+
+- **Query結果**: `Distances`フィールドでcosine distance（0-2）を返す
+- **スコア変換**: `score = 1.0 - (distance / 2.0)` で0-1に正規化
+- **metadataフィルタ**: string型のみサポート、nullableフィールドは空文字列で保存
+
+## 8. 完了条件
 
 ```bash
 go test ./internal/store/... -v
@@ -257,3 +290,4 @@ go test ./internal/store/... -v
 5. ListRecentがcreatedAt降順で結果を返す
 6. GlobalConfig CRUD（UpsertGlobal, GetGlobal）が正常動作
 7. namespace分離が正しく機能
+8. groupID=nil時に全group対象で検索/取得
