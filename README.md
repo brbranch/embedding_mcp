@@ -249,6 +249,50 @@ APIキー解決優先順位:
 go test ./internal/service/...
 ```
 
+## JSON-RPC Handler
+
+### Handler
+
+JSON-RPC 2.0リクエストをパースし、適切なサービスメソッドにディスパッチ:
+
+```go
+handler := jsonrpc.New(noteService, configService, globalService)
+response := handler.Handle(ctx, requestBytes)
+```
+
+### 対応メソッド
+
+| メソッド | 説明 |
+|----------|------|
+| `memory.add_note` | ノート追加 |
+| `memory.search` | ベクトル検索（topKデフォルト: 5） |
+| `memory.get` | ノート取得 |
+| `memory.update` | ノート更新 |
+| `memory.list_recent` | 最新ノート取得 |
+| `memory.get_config` | 設定取得 |
+| `memory.set_config` | 設定変更 |
+| `memory.upsert_global` | グローバル設定upsert |
+| `memory.get_global` | グローバル設定取得 |
+
+### エラーコード
+
+| コード | 名前 | 説明 |
+|--------|------|------|
+| -32700 | Parse Error | 不正なJSON |
+| -32600 | Invalid Request | 不正なリクエスト（jsonrpc != "2.0"等） |
+| -32601 | Method Not Found | 未知のメソッド |
+| -32602 | Invalid Params | 不正なパラメータ |
+| -32603 | Internal Error | 内部エラー |
+| -32001 | API Key Missing | APIキー未設定 |
+| -32002 | Invalid Key Prefix | global.プレフィックスなし |
+| -32003 | Not Found | リソース未検出 |
+
+### テスト実行
+
+```bash
+go test ./internal/jsonrpc/...
+```
+
 ## 開発状況
 
 現在開発中です。
