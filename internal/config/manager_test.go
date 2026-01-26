@@ -240,7 +240,6 @@ func TestManager_UpdateEmbedder(t *testing.T) {
 	// 初期設定を確認
 	cfg := mgr.GetConfig()
 	initialProvider := cfg.Embedder.Provider
-	initialModel := cfg.Embedder.Model
 
 	// 設定を更新
 	newModel := "text-embedding-3-large"

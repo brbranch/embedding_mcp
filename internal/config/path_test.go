@@ -30,7 +30,14 @@ func TestCanonicalizeProjectID_AbsolutePath(t *testing.T) {
 	// 一時ディレクトリを作成
 	tmpDir := t.TempDir()
 	relPath := "test/project"
-	fullPath := filepath.Join(tmpDir, relPath)
+
+	// tmpDirのシンボリックリンクを解決
+	resolvedTmpDir, err := filepath.EvalSymlinks(tmpDir)
+	if err != nil {
+		resolvedTmpDir = tmpDir
+	}
+
+	fullPath := filepath.Join(resolvedTmpDir, relPath)
 
 	// 作業ディレクトリを一時ディレクトリに変更
 	origDir, err := os.Getwd()
@@ -80,8 +87,14 @@ func TestCanonicalizeProjectID_Symlink(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if canonical != realDir {
-		t.Errorf("expected %q, got %q", realDir, canonical)
+	// 期待値もシンボリックリンクを解決して比較
+	expectedPath, err := filepath.EvalSymlinks(realDir)
+	if err != nil {
+		expectedPath = realDir
+	}
+
+	if canonical != expectedPath {
+		t.Errorf("expected %q, got %q", expectedPath, canonical)
 	}
 }
 
@@ -124,8 +137,14 @@ func TestCanonicalizeProjectID_AlreadyAbsolute(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if canonical != projectDir {
-		t.Errorf("expected %q, got %q", projectDir, canonical)
+	// 期待値もシンボリックリンクを解決して比較
+	expectedPath, err := filepath.EvalSymlinks(projectDir)
+	if err != nil {
+		expectedPath = projectDir
+	}
+
+	if canonical != expectedPath {
+		t.Errorf("expected %q, got %q", expectedPath, canonical)
 	}
 }
 
