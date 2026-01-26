@@ -29,15 +29,45 @@ go build ./...
 go build ./cmd/mcp-memory
 ```
 
-### 起動（予定）
+### 起動
 
 ```bash
-# stdio（デフォルト）
+# stdio transport（デフォルト）
 ./mcp-memory serve
 
-# HTTP
+# または直接実行
+go run ./cmd/mcp-memory serve
+
+# HTTP transport
 ./mcp-memory serve --transport http --port 8765
+
+# カスタム設定ファイル
+./mcp-memory serve --config /path/to/config.json
 ```
+
+### CLI オプション
+
+| オプション | 短縮形 | デフォルト | 説明 |
+|------------|--------|------------|------|
+| `--transport` | `-t` | stdio | Transport type: stdio, http |
+| `--host` | - | 127.0.0.1 | HTTP bind host |
+| `--port` | `-p` | 8765 | HTTP bind port |
+| `--config` | `-c` | ~/.local-mcp-memory/config.json | Config file path |
+
+### ビルド時デフォルト変更
+
+```bash
+# HTTP をデフォルトにしてビルド
+go build -ldflags "-X main.defaultTransport=http" -o mcp-memory ./cmd/mcp-memory
+
+# このバイナリは --transport 指定なしでHTTPで起動
+./mcp-memory serve
+```
+
+### シグナルハンドリング
+
+- `SIGINT` (Ctrl+C): Graceful shutdown
+- `SIGTERM`: Graceful shutdown
 
 ## データモデル
 
@@ -354,7 +384,7 @@ err := server.Run(ctx)
 go test ./internal/transport/http/...
 ```
 
-**動作確認（CLI完成後）:**
+**動作確認:**
 
 ```bash
 # HTTPサーバー起動
