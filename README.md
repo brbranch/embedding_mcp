@@ -211,6 +211,44 @@ APIキー解決優先順位:
 | `ErrEmptyEmbedding` | 空の埋め込み |
 | `ErrUnknownProvider` | 未知のプロバイダ |
 
+## Service Layer
+
+### NoteService
+
+ノートのCRUD操作と検索を提供:
+
+| メソッド | 説明 |
+|----------|------|
+| `AddNote` | ノート追加（埋め込み生成→Store保存） |
+| `Search` | ベクトル検索（クエリ埋め込み→cosine検索） |
+| `Get` | ID指定でノート取得 |
+| `Update` | ノート更新（text変更時のみ再埋め込み） |
+| `ListRecent` | 最新ノート取得（createdAt降順） |
+
+### ConfigService
+
+設定の取得・変更を提供:
+
+| メソッド | 説明 |
+|----------|------|
+| `GetConfig` | 現在の設定を取得 |
+| `SetConfig` | Embedder設定を変更（provider/model変更時はdimリセット） |
+
+### GlobalService
+
+プロジェクト単位のグローバル設定を提供:
+
+| メソッド | 説明 |
+|----------|------|
+| `UpsertGlobal` | グローバル設定のupsert（`global.`プレフィックス必須） |
+| `GetGlobal` | グローバル設定の取得 |
+
+### テスト実行
+
+```bash
+go test ./internal/service/...
+```
+
 ## 開発状況
 
 現在開発中です。

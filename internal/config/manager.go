@@ -152,6 +152,14 @@ func (m *Manager) UpdateDim(dim int) error {
 	return nil
 }
 
+// NewManagerWithConfig は指定した設定でManagerを作成する（テスト用）
+func NewManagerWithConfig(cfg *model.Config) *Manager {
+	return &Manager{
+		config:     cfg,
+		configPath: "", // テスト用なので空
+	}
+}
+
 // DefaultConfig はデフォルト設定を返す
 func DefaultConfig(configPath, dataDir string) *model.Config {
 	return &model.Config{
