@@ -148,13 +148,13 @@
 ---
 
 #### 4. VectorStore抽象化とChroma実装 (internal/store)
-- [ ] Store interface定義（AddNote, Search, Get, Update, Delete, ListRecent, UpsertGlobal, GetGlobal）
-- [ ] Chroma実装（github.com/amikos-tech/chroma-go使用）
+- [x] Store interface定義（AddNote, Search, Get, Update, Delete, ListRecent, UpsertGlobal, GetGlobal）
+- [x] Chroma実装（github.com/amikos-tech/chroma-go使用）
   - Chromaサーバー接続（デフォルト: localhost:8000）
   - または embedded mode（インプロセス）対応
-- [ ] ベクトル検索実装
-- [ ] namespace分離対応（Chromaのcollection単位）
-- [ ] 検索フィルタ実装
+- [x] ベクトル検索実装
+- [x] namespace分離対応（Chromaのcollection単位）
+- [x] 検索フィルタ実装
   - tags: AND検索、空配列/nullはフィルタなし、大小文字区別
   - since/until: UTC ISO8601、境界条件は `since <= createdAt < until`
 
