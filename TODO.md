@@ -283,7 +283,7 @@
 ### Phase 8: ドキュメント最終確認
 
 #### 12. README最終確認・整理
-- [ ] 以下の項目がREADMEに記載されていることを確認:
+- [x] 以下の項目がREADMEに記載されていることを確認:
   - stdio起動例: `mcp-memory serve`
   - HTTP起動例: `mcp-memory serve --transport http --host 127.0.0.1 --port 8765`
   - curl でHTTP JSON-RPCを叩く例
@@ -293,8 +293,8 @@
   - Ollama embedderは将来実装予定の旨
   - Chromaのセットアップ方法（サーバー起動 or embedded mode）
   - OpenAI apiKeyの注意喚起（設定ファイル保存時のセキュリティ）
-- [ ] 不足項目があれば追記
-- [ ] 全体の構成・読みやすさを確認
+- [x] 不足項目があれば追記
+- [x] 全体の構成・読みやすさを確認
 
 **完了条件**: README.mdが上記項目を全て含み、整理されていること
 
