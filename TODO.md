@@ -178,20 +178,20 @@
 ### Phase 3: ビジネスロジック
 
 #### 6. サービス層 (internal/service)
-- [ ] NoteService
+- [x] NoteService
   - add_note: 埋め込み生成→Store保存、{ id, namespace }返却
   - search: 埋め込み生成→cosine検索、score降順ソート(0-1正規化)
   - get: ID指定で1件取得
   - update: patch適用、text変更時のみ再埋め込み
   - list_recent: createdAt降順でlimit件取得
-- [ ] ConfigService
+- [x] ConfigService
   - get_config: transportDefaults/embedder/store/paths返却（build-time default含む）
   - set_config: embedder設定のみ変更可（store/pathsは再起動必要）、effectiveNamespace返却
-- [ ] GlobalService
+- [x] GlobalService
   - upsert_global: key制約("global."プレフィックス必須、それ以外はerror)、{ ok, id, namespace }返却
   - get_global: { namespace, found, id?, value?, updatedAt? }返却
   - 標準キー: global.memory.embedder.provider, global.memory.embedder.model, global.memory.groupDefaults, global.project.conventions
-- [ ] 時刻処理: 全てUTC、ISO8601形式
+- [x] 時刻処理: 全てUTC、ISO8601形式
 
 **完了条件**: `go test ./internal/service/...` が成功すること
 
