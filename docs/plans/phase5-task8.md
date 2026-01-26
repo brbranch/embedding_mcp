@@ -53,6 +53,7 @@ func (s *Server) Run(ctx context.Context) error
 - 入力: stdinから1行ずつ読み取り（bufio.Scanner使用）
 - 出力: レスポンスを1行JSON + 改行で出力
 - JSON内の改行は `\n` エスケープ（標準のJSONエンコーダが自動処理）
+- **バッファサイズ**: bufio.Scannerのデフォルト64KB制限を1MBに拡張（長文textに対応）
 
 ### 処理フロー
 1. bufio.Scannerで1行読み取り
@@ -63,11 +64,16 @@ func (s *Server) Run(ctx context.Context) error
 ### Graceful Shutdown
 - contextのキャンセルを検知してループ終了
 - EOFでも正常終了（nil返却）
+- **注**: SIGINT/SIGTERM対応はTask 10（CLIエントリポイント）で実装。本パッケージはcontextのキャンセルを受けてループ終了するのみ
 
-### エラーハンドリング
-- EOF → nil返却（正常終了）
-- JSON解析エラー → handler側でJSON-RPC ParseError返却
-- stdout書き込みエラー → エラー返却
+### エラーハンドリング・戻り値
+| 状況 | 戻り値 | 理由 |
+|------|--------|------|
+| EOF（stdin終了） | `nil` | 正常終了 |
+| contextキャンセル | `ctx.Err()` | キャンセル理由を伝播 |
+| Scanner読み取りエラー | `scanner.Err()` | 読み取り失敗 |
+| stdout書き込みエラー | エラー | 書き込み失敗 |
+| JSON解析エラー | 継続（エラーレスポンス出力） | handler側でParseError返却 |
 
 ## 関数シグネチャ
 
@@ -127,11 +133,20 @@ func (s *Server) Run(ctx context.Context) error
 ### シャットダウン
 7. コンテキストキャンセル
    - 入力: contextがキャンセルされた場合
-   - 期待: Runがcontext.Canceledエラーで終了
+   - 期待: Runがctx.Err()で終了
 
 8. EOF
    - 入力: stdinがEOFに達した場合
    - 期待: Runがnilで正常終了
+
+### バッファ制限
+9. 大きなJSON（1MB未満）
+   - 入力: 長文textを含むリクエスト
+   - 期待: 正常に処理される
+
+10. 巨大なJSON（1MB超過）
+    - 入力: 1MBを超えるリクエスト
+    - 期待: Scanner読み取りエラー
 
 ## 依存関係
 - internal/jsonrpc: Handler
@@ -144,5 +159,10 @@ func (s *Server) Run(ctx context.Context) error
 5. テスト実装
 
 ## 備考
-- SIGINT/SIGTERM対応はcmd/mcp-memory（CLIエントリポイント）側で実装
+- SIGINT/SIGTERM対応はTask 10（cmd/mcp-memory CLIエントリポイント）で実装予定
 - このパッケージはcontextのキャンセルを受けてループ終了するのみ
+
+## レビュー対応履歴
+- 2026-01-26: bufio.Scanner 64KB制限を1MBに拡張する方針を追記
+- 2026-01-26: contextキャンセル時の戻り値をctx.Err()に統一（戻り値表を追加）
+- 2026-01-26: graceful shutdownがTask 10の範囲であることを明記
