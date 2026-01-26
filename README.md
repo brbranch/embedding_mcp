@@ -79,6 +79,56 @@ type GlobalConfig struct {
 - `global.memory.groupDefaults`
 - `global.project.conventions`
 
+## 設定管理
+
+### 設定ファイル
+
+デフォルトの設定ファイルパス: `~/.local-mcp-memory/config.json`
+
+```json
+{
+  "transportDefaults": {
+    "defaultTransport": "stdio"
+  },
+  "embedder": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "dim": 0
+  },
+  "store": {
+    "type": "chroma"
+  },
+  "paths": {
+    "configPath": "~/.local-mcp-memory/config.json",
+    "dataDir": "~/.local-mcp-memory/data"
+  }
+}
+```
+
+### 環境変数
+
+OpenAI APIキーは環境変数で設定可能（設定ファイルより優先）:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+### projectId正規化
+
+projectIdは以下の順序で正規化されます:
+
+1. `~` をホームディレクトリに展開
+2. 絶対パス化
+3. シンボリックリンク解決（失敗時は絶対パスまで）
+
+例: `~/project` → `/Users/xxx/project`
+
+### namespace
+
+埋め込みのnamespaceは `{provider}:{model}:{dim}` 形式で自動生成されます。
+
+例: `openai:text-embedding-3-small:1536`
+
 ## 開発状況
 
 現在開発中です。
