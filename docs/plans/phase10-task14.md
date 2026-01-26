@@ -78,9 +78,8 @@ clients/python/
 from typing import Any
 from datetime import datetime
 from .models import (
-    Note, NoteInput, SearchResult, SearchInput,
-    UpdatePatch, ConfigResult, SetConfigInput,
-    GlobalValue, ListRecentInput
+    Note, SearchResult, ListRecentResult,
+    ConfigResult, GlobalValue
 )
 from .exceptions import MCPMemoryError, RPCError
 
@@ -618,6 +617,7 @@ MEMORY_TOOLS = [
 - `test_search_empty_result`: 結果なし
 - `test_search_topk_default`: topKデフォルト値（5）
 - `test_search_topk_boundary_zero`: topK=0（エラー期待）
+- `test_search_topk_boundary_negative`: topK=-1（エラー期待）
 - `test_search_topk_boundary_large`: topK=1000（大きな値）
 - `test_search_since_until`: since/until境界条件
 
@@ -713,6 +713,7 @@ dependencies = [
 [project.optional-dependencies]
 langchain = [
     "langchain-core>=0.3.0",
+    "langgraph>=0.2.0",
 ]
 dev = [
     "pytest>=8.0.0",
