@@ -90,14 +90,23 @@ type UpdateParams struct {
     Patch PatchParams `json:"patch"`
 }
 
+// PatchParams は memory.update のパッチパラメータ
+// 注意: JSON-RPCでは「キーが存在しない」と「null」を区別できる
+// - キーが存在しない → フィールドを変更しない
+// - null → フィールドをnullにクリアする（title, source, metadataのみ）
+// この区別を実現するため、json.RawMessageを使用してパース時に判定する
 type PatchParams struct {
-    Title    *string          `json:"title"`
-    Text     *string          `json:"text"`
-    Tags     *[]string        `json:"tags"`
-    Source   *string          `json:"source"`
-    GroupID  *string          `json:"groupId"`
-    Metadata *map[string]any  `json:"metadata"`
+    Title    json.RawMessage `json:"title,omitempty"`    // 存在しない/null/string
+    Text     *string         `json:"text,omitempty"`     // 存在しない/string（nullはtext必須違反）
+    Tags     *[]string       `json:"tags,omitempty"`
+    Source   json.RawMessage `json:"source,omitempty"`   // 存在しない/null/string
+    GroupID  *string         `json:"groupId,omitempty"`
+    Metadata json.RawMessage `json:"metadata,omitempty"` // 存在しない/null/object
 }
+
+// ParsePatch はPatchParamsをservice.NotePatchに変換
+// json.RawMessageを解釈して「未指定」「null」「値あり」を判定する
+func ParsePatch(p *PatchParams) (*service.NotePatch, error)
 
 // ListRecentParams は memory.list_recent のパラメータ
 type ListRecentParams struct {
@@ -149,8 +158,15 @@ serviceから返されるエラーをJSON-RPCエラーコードに変換:
 | service.ErrQueryRequired | -32602 (InvalidParams) |
 | service.ErrIDRequired | -32602 (InvalidParams) |
 | service.ErrInvalidTimeFormat | -32602 (InvalidParams) |
+| service.ErrKeyRequired（get_global key空） | -32602 (InvalidParams) |
 | embedder.ErrAPIKeyRequired | -32001 (APIKeyMissing) |
+| config/store由来のエラー | -32603 (InternalError) |
 | その他 | -32603 (InternalError) |
+
+### key必須チェック
+
+`memory.get_global` で key が空文字の場合、Handler側で InvalidParams を返す。
+（service層では空keyをnot found扱いにしているため、Handler側で事前検証が必要）
 
 ### Handle処理フロー
 
@@ -208,7 +224,7 @@ serviceから返されるエラーをJSON-RPCエラーコードに変換:
    - projectId未指定 → InvalidParams
 
 8. **memory.get_config**
-   - 正常系: 設定が返る
+   - 正常系: transportDefaults, embedder, store, pathsが返る
 
 9. **memory.set_config**
    - 正常系: {ok: true, effectiveNamespace}が返る
@@ -223,6 +239,15 @@ serviceから返されるエラーをJSON-RPCエラーコードに変換:
     - 正常系（存在する）: found: true, value返る
     - 正常系（存在しない）: found: false
     - projectId未指定 → InvalidParams
+    - key未指定 → InvalidParams
+
+12. **エラーハンドリング追加テスト**
+    - groupId不正文字（memory.add_note） → InvalidParams
+    - createdAt不正形式（memory.add_note） → InvalidParams
+    - since/until不正形式（memory.search） → InvalidParams
+    - updatedAt不正形式（memory.upsert_global） → InvalidParams
+    - memory.updateでtitle/source/metadataをnullでクリア → 正常に更新される
+    - set_config で embedder未指定 → {ok: true}が返る（変更なし）
 
 ## 実装順序
 
