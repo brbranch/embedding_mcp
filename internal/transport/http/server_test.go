@@ -290,3 +290,45 @@ type errorReader struct {
 func (r *errorReader) Read(p []byte) (n int, err error) {
 	return 0, r.err
 }
+
+// TestServer_TooLargeBody はサイズ制限を超えるボディをテスト
+func TestServer_TooLargeBody(t *testing.T) {
+	handler := newMockHandler()
+	server := New(handler, Config{
+		Addr: "127.0.0.1:0",
+	})
+
+	// MaxBodySize (1MB) を超えるボディ
+	largeBody := strings.Repeat("a", MaxBodySize+1)
+	req := httptest.NewRequest("POST", "/rpc", strings.NewReader(largeBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	server.handleRPC(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("expected status 413, got %d", w.Code)
+	}
+}
+
+// TestServer_DefaultAddr はAddr未設定時のデフォルト値をテスト
+func TestServer_DefaultAddr(t *testing.T) {
+	handler := newMockHandler()
+
+	// Addr未設定
+	server := New(handler, Config{})
+
+	if server.srv.Addr != DefaultAddr {
+		t.Errorf("expected default addr %s, got %s", DefaultAddr, server.srv.Addr)
+	}
+}
+
+// TestServer_ReadHeaderTimeout はReadHeaderTimeoutが設定されていることをテスト
+func TestServer_ReadHeaderTimeout(t *testing.T) {
+	handler := newMockHandler()
+	server := New(handler, Config{})
+
+	if server.srv.ReadHeaderTimeout == 0 {
+		t.Error("expected ReadHeaderTimeout to be set")
+	}
+}

@@ -6,7 +6,14 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
+
+// MaxBodySize はリクエストボディの最大サイズ（1MB、stdioと統一）
+const MaxBodySize = 1024 * 1024
+
+// DefaultAddr はデフォルトのlistenアドレス
+const DefaultAddr = "127.0.0.1:8765"
 
 // Handler はJSON-RPCリクエストを処理する
 type Handler interface {
@@ -28,6 +35,12 @@ type Server struct {
 
 // New は新しいServerを生成
 func New(handler Handler, config Config) *Server {
+	// Addr未設定の場合はデフォルト値を使用
+	addr := config.Addr
+	if addr == "" {
+		addr = DefaultAddr
+	}
+
 	s := &Server{
 		handler: handler,
 		config:  config,
@@ -37,8 +50,9 @@ func New(handler Handler, config Config) *Server {
 	mux.HandleFunc("/rpc", s.handleRPC)
 
 	s.srv = &http.Server{
-		Addr:    config.Addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second, // DoS対策
 	}
 
 	return s
@@ -84,10 +98,15 @@ func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// リクエストボディ読み取り
-	body, err := io.ReadAll(r.Body)
+	// リクエストボディ読み取り（サイズ制限あり）
+	limitedReader := io.LimitReader(r.Body, MaxBodySize+1)
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	if len(body) > MaxBodySize {
+		http.Error(w, "Request Entity Too Large", http.StatusRequestEntityTooLarge)
 		return
 	}
 
@@ -129,5 +148,5 @@ func (s *Server) handleCORS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-	w.Header().Set("Vary", "Origin")
+	w.Header().Add("Vary", "Origin") // 既存のVaryヘッダーを保持
 }
