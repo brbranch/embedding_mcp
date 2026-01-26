@@ -85,6 +85,16 @@ func parseSearchFlags(args []string) (*SearchOptions, error) {
 		return nil, fmt.Errorf("query is required (or use --stdin)")
 	}
 
+	// Validate top-k
+	if opts.TopK <= 0 {
+		return nil, fmt.Errorf("top-k must be greater than 0")
+	}
+
+	// Validate format
+	if opts.Format != "text" && opts.Format != "json" {
+		return nil, fmt.Errorf("invalid format: %s (must be text or json)", opts.Format)
+	}
+
 	return opts, nil
 }
 

@@ -8,12 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/brbranch/embedding_mcp/internal/config"
-	"github.com/brbranch/embedding_mcp/internal/embedder"
+	"github.com/brbranch/embedding_mcp/internal/bootstrap"
 	"github.com/brbranch/embedding_mcp/internal/jsonrpc"
-	"github.com/brbranch/embedding_mcp/internal/model"
-	"github.com/brbranch/embedding_mcp/internal/service"
-	"github.com/brbranch/embedding_mcp/internal/store"
 	"github.com/brbranch/embedding_mcp/internal/transport/http"
 	"github.com/brbranch/embedding_mcp/internal/transport/stdio"
 )
@@ -33,28 +29,29 @@ type Options struct {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
-	}
-
 	var err error
-	switch os.Args[1] {
-	case "serve":
-		// 既存の run() フローを使用
-		err = run(os.Args[1:])
-	case "search":
-		err = runSearchCmd(os.Args[2:])
-	case "version", "-v", "--version":
-		printVersion()
-		return
-	case "help", "-h", "--help":
-		printUsage()
-		return
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
-		printUsage()
-		os.Exit(1)
+
+	// 引数なしの場合はserveをデフォルト実行
+	if len(os.Args) < 2 {
+		err = run([]string{})
+	} else {
+		switch os.Args[1] {
+		case "serve":
+			// 既存の run() フローを使用
+			err = run(os.Args[1:])
+		case "search":
+			err = runSearchCmd(os.Args[2:])
+		case "version", "-v", "--version":
+			printVersion()
+			return
+		case "help", "-h", "--help":
+			printUsage()
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+			printUsage()
+			os.Exit(1)
+		}
 	}
 
 	if err != nil {
@@ -130,12 +127,19 @@ func parseFlags(args []string) (*Options, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Config file path")
 	fs.StringVar(&opts.ConfigPath, "c", "", "Config file path (shorthand)")
 
-	// serveサブコマンド確認
-	if len(args) == 0 || args[0] != "serve" {
+	// 空配列の場合はserveをデフォルトとして扱う
+	// serveサブコマンド確認（引数なしまたは"serve"で始まる場合のみ許可）
+	var flagArgs []string
+	if len(args) == 0 {
+		// 引数なし: デフォルトでserve
+		flagArgs = []string{}
+	} else if args[0] == "serve" {
+		flagArgs = args[1:]
+	} else {
 		return nil, fmt.Errorf("usage: mcp-memory serve [options]")
 	}
 
-	if err := fs.Parse(args[1:]); err != nil {
+	if err := fs.Parse(flagArgs); err != nil {
 		return nil, err
 	}
 
@@ -167,23 +171,15 @@ func setupSignalHandler() (context.Context, context.CancelFunc) {
 
 // runServe はserveコマンドを実行
 func runServe(ctx context.Context, opts *Options) error {
-	// 設定ロード
-	configManager, err := config.NewManager(opts.ConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to create config manager: %w", err)
-	}
-	if err := configManager.Load(); err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	cfg := configManager.GetConfig()
-
-	// コンポーネント初期化
-	handler, cleanup, err := initComponents(ctx, cfg, configManager)
+	// bootstrap.Initializeを使用して共通初期化ロジックを実行
+	services, cleanup, err := bootstrap.Initialize(ctx, opts.ConfigPath)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
+
+	// JSON-RPC Handler初期化
+	handler := jsonrpc.New(services.NoteService, services.ConfigService, services.GlobalService)
 
 	// transport起動
 	switch opts.Transport {
@@ -201,51 +197,4 @@ func runServe(ctx context.Context, opts *Options) error {
 	default:
 		return fmt.Errorf("unknown transport: %s", opts.Transport)
 	}
-}
-
-// initComponents は依存コンポーネントを初期化
-func initComponents(ctx context.Context, cfg *model.Config, configManager *config.Manager) (*jsonrpc.Handler, func(), error) {
-	// namespace生成
-	namespace := config.GenerateNamespace(cfg.Embedder.Provider, cfg.Embedder.Model, cfg.Embedder.Dim)
-
-	// 1. Embedder初期化（dimUpdater経由でManager更新）
-	emb, err := embedder.NewEmbedder(&cfg.Embedder, os.Getenv("OPENAI_API_KEY"), configManager)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create embedder: %w", err)
-	}
-
-	// 2. Store初期化（タイプに応じて）
-	var st store.Store
-	switch cfg.Store.Type {
-	case "chroma":
-		url := "http://localhost:8000"
-		if cfg.Store.URL != nil && *cfg.Store.URL != "" {
-			url = *cfg.Store.URL
-		}
-		st, err = store.NewChromaStore(url)
-	default:
-		st = store.NewMemoryStore() // テスト・フォールバック用
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create store: %w", err)
-	}
-
-	// 3. Store初期化（namespace設定）
-	if err := st.Initialize(ctx, namespace); err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize store: %w", err)
-	}
-
-	// 4. Services初期化
-	noteService := service.NewNoteService(emb, st, namespace)
-	configService := service.NewConfigService(configManager)
-	globalService := service.NewGlobalService(st, namespace)
-
-	// 5. JSON-RPC Handler初期化
-	handler := jsonrpc.New(noteService, configService, globalService)
-
-	cleanup := func() {
-		st.Close()
-	}
-
-	return handler, cleanup, nil
 }

@@ -141,6 +141,7 @@ func TestParseFlags_InvalidPort(t *testing.T) {
 
 // TestParseFlags_InvalidSubcommand は不正なサブコマンドでエラーを返すことをテスト
 func TestParseFlags_InvalidSubcommand(t *testing.T) {
+	// "unknown" is an invalid subcommand; empty args should default to serve (no error)
 	args := []string{"unknown"}
 	_, err := parseFlags(args)
 	if err == nil {
@@ -357,6 +358,21 @@ func BenchmarkParseFlags(b *testing.B) {
 // NOTE: Exampleテストは公開関数が必要だが、parseFlagsは非公開なので
 // ここでは通常のテストケースとして実装済み
 
+// TestParseFlags_NoArgs tests that empty args defaults to serve behavior
+func TestParseFlags_NoArgs(t *testing.T) {
+	// When args is empty, parseFlags should treat it as "serve" (default)
+	args := []string{}
+	opts, err := parseFlags(args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have default values as if "serve" was invoked
+	if opts.Transport != defaultTransport {
+		t.Errorf("expected transport %s, got %s", defaultTransport, opts.Transport)
+	}
+}
+
 // テーブル駆動テスト: parseFlags バリデーション
 func TestParseFlags_Validation_TableDriven(t *testing.T) {
 	testCases := []struct {
@@ -394,10 +410,9 @@ func TestParseFlags_Validation_TableDriven(t *testing.T) {
 			errorMsg:    "invalid port: 99999 (must be 1-65535)",
 		},
 		{
-			name:        "no subcommand",
+			name:        "no subcommand (defaults to serve)",
 			args:        []string{},
-			expectError: true,
-			errorMsg:    "usage: mcp-memory serve [options]",
+			expectError: false,
 		},
 		{
 			name:        "wrong subcommand",

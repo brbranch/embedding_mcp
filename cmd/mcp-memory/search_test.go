@@ -365,3 +365,98 @@ func TestSearchCompiles(t *testing.T) {
 	// This test just ensures the search.go file compiles correctly
 	_ = io.Discard
 }
+
+// TestParseSearchFlags_TopKValidation tests top-k validation
+func TestParseSearchFlags_TopKValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "negative top-k",
+			args:    []string{"-p", "/test/project", "-k", "-1", "query"},
+			wantErr: true,
+			errMsg:  "top-k must be greater than 0",
+		},
+		{
+			name:    "zero top-k",
+			args:    []string{"-p", "/test/project", "-k", "0", "query"},
+			wantErr: true,
+			errMsg:  "top-k must be greater than 0",
+		},
+		{
+			name:    "valid positive top-k",
+			args:    []string{"-p", "/test/project", "-k", "10", "query"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseSearchFlags(tt.args)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error but got nil")
+				} else if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("expected error to contain %q, got %q", tt.errMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestParseSearchFlags_FormatValidation tests format validation
+func TestParseSearchFlags_FormatValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "invalid format",
+			args:    []string{"-p", "/test/project", "-f", "yaml", "query"},
+			wantErr: true,
+			errMsg:  "invalid format: yaml (must be text or json)",
+		},
+		{
+			name:    "another invalid format",
+			args:    []string{"-p", "/test/project", "--format", "xml", "query"},
+			wantErr: true,
+			errMsg:  "invalid format: xml (must be text or json)",
+		},
+		{
+			name:    "valid text format",
+			args:    []string{"-p", "/test/project", "-f", "text", "query"},
+			wantErr: false,
+		},
+		{
+			name:    "valid json format",
+			args:    []string{"-p", "/test/project", "-f", "json", "query"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseSearchFlags(tt.args)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error but got nil")
+				} else if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("expected error to contain %q, got %q", tt.errMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
