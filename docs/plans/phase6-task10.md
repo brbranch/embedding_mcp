@@ -94,30 +94,60 @@ func setupSignalHandler() (context.Context, context.CancelFunc) {
 
 ### 5. 依存コンポーネント初期化
 
+**重要**: 既存の実装に合わせて以下の関数シグネチャを使用する:
+- `embedder.NewEmbedder(cfg, envAPIKey, dimUpdater)`
+- `store.NewChromaStore(url)` または `store.NewMemoryStore()`
+- `store.Initialize(ctx, namespace)` と `store.Close()` が必須
+- `service.NewNoteService(emb, store, namespace)`
+- `service.NewConfigService(mgr)`
+- `service.NewGlobalService(store, namespace)`
+
 ```go
 // initComponents は各コンポーネントを初期化する
-func initComponents(cfg *model.Config) (*jsonrpc.Handler, error) {
-    // 1. Embedder初期化
-    embedder, err := embedder.New(cfg.Embedder)
+func initComponents(ctx context.Context, cfg *model.Config, configManager *config.Manager) (*jsonrpc.Handler, func(), error) {
+    // namespace生成
+    namespace := config.GenerateNamespace(cfg.Embedder.Provider, cfg.Embedder.Model, cfg.Embedder.Dim)
+
+    // 1. Embedder初期化（dimUpdater経由でManager更新）
+    emb, err := embedder.NewEmbedder(&cfg.Embedder, os.Getenv("OPENAI_API_KEY"), configManager.UpdateDim)
     if err != nil {
-        return nil, fmt.Errorf("failed to create embedder: %w", err)
+        return nil, nil, fmt.Errorf("failed to create embedder: %w", err)
     }
 
-    // 2. Store初期化
-    store, err := store.New(cfg.Store)
+    // 2. Store初期化（タイプに応じて）
+    var st store.Store
+    switch cfg.Store.Type {
+    case "chroma":
+        url := "http://localhost:8000"
+        if cfg.Store.URL != nil && *cfg.Store.URL != "" {
+            url = *cfg.Store.URL
+        }
+        st, err = store.NewChromaStore(url)
+    default:
+        st = store.NewMemoryStore() // テスト・フォールバック用
+    }
     if err != nil {
-        return nil, fmt.Errorf("failed to create store: %w", err)
+        return nil, nil, fmt.Errorf("failed to create store: %w", err)
     }
 
-    // 3. Services初期化
-    noteService := service.NewNoteService(store, embedder, configManager)
+    // 3. Store初期化（namespace設定）
+    if err := st.Initialize(ctx, namespace); err != nil {
+        return nil, nil, fmt.Errorf("failed to initialize store: %w", err)
+    }
+
+    // 4. Services初期化
+    noteService := service.NewNoteService(emb, st, namespace)
     configService := service.NewConfigService(configManager)
-    globalService := service.NewGlobalService(store, configManager)
+    globalService := service.NewGlobalService(st, namespace)
 
-    // 4. JSON-RPC Handler初期化
+    // 5. JSON-RPC Handler初期化
     handler := jsonrpc.New(noteService, configService, globalService)
 
-    return handler, nil
+    cleanup := func() {
+        st.Close()
+    }
+
+    return handler, cleanup, nil
 }
 ```
 
@@ -229,6 +259,21 @@ func initComponents(cfg *model.Config, configManager *config.Manager) (*jsonrpc.
 
 13. **HTTP起動・終了**
     - HTTP transport起動後、contextキャンセルで正常終了すること
+
+#### 追加テストケース（Copilotレビュー指摘対応）
+
+14. **環境変数によるapiKey上書き**
+    - OPENAI_API_KEY環境変数が設定されている場合、configよりも優先されること
+
+15. **設定ファイルが存在しない場合のデフォルト動作**
+    - 設定ファイルがなくてもデフォルト設定で起動できること
+
+16. **Store初期化・Close呼び出し**
+    - Store.Initialize(ctx, namespace)が呼ばれること
+    - 終了時にStore.Close()が呼ばれること
+
+17. **HTTP CORS設定の動作確認**
+    - 設定ファイルでCORSオリジンが指定されている場合、HTTP transportに反映されること
 
 ## 依存関係
 
@@ -359,7 +404,7 @@ func runServe(ctx context.Context, opts *Options) error {
     cfg := configManager.GetConfig()
 
     // コンポーネント初期化
-    handler, cleanup, err := initComponents(cfg, configManager)
+    handler, cleanup, err := initComponents(ctx, cfg, configManager)
     if err != nil {
         return err
     }
@@ -371,38 +416,60 @@ func runServe(ctx context.Context, opts *Options) error {
         server := stdio.New(handler)
         return server.Run(ctx)
     case "http":
-        server := http.New(handler, http.Config{
+        // HTTP設定（CORS含む）
+        httpConfig := http.Config{
             Addr: fmt.Sprintf("%s:%d", opts.Host, opts.Port),
-        })
+        }
+        // 設定ファイルからCORSOrigins読み込み（将来的にmodel.Configに追加予定）
+        // 現時点ではデフォルト（CORS無効）
+        server := http.New(handler, httpConfig)
         return server.Run(ctx)
     default:
         return fmt.Errorf("unknown transport: %s", opts.Transport)
     }
 }
 
-func initComponents(cfg *model.Config, configManager *config.Manager) (*jsonrpc.Handler, func(), error) {
-    // Embedder
-    emb, err := embedder.New(cfg.Embedder, configManager)
+func initComponents(ctx context.Context, cfg *model.Config, configManager *config.Manager) (*jsonrpc.Handler, func(), error) {
+    // namespace生成
+    namespace := config.GenerateNamespace(cfg.Embedder.Provider, cfg.Embedder.Model, cfg.Embedder.Dim)
+
+    // 1. Embedder初期化（dimUpdater経由でManager更新）
+    emb, err := embedder.NewEmbedder(&cfg.Embedder, os.Getenv("OPENAI_API_KEY"), configManager.UpdateDim)
     if err != nil {
         return nil, nil, fmt.Errorf("failed to create embedder: %w", err)
     }
 
-    // Store
-    st, err := store.New(cfg.Store)
+    // 2. Store初期化（タイプに応じて）
+    var st store.Store
+    switch cfg.Store.Type {
+    case "chroma":
+        url := "http://localhost:8000"
+        if cfg.Store.URL != nil && *cfg.Store.URL != "" {
+            url = *cfg.Store.URL
+        }
+        st, err = store.NewChromaStore(url)
+    default:
+        st = store.NewMemoryStore() // テスト・フォールバック用
+    }
     if err != nil {
         return nil, nil, fmt.Errorf("failed to create store: %w", err)
     }
 
-    // Services
-    noteService := service.NewNoteService(st, emb, configManager)
-    configService := service.NewConfigService(configManager, defaultTransport)
-    globalService := service.NewGlobalService(st, configManager)
+    // 3. Store初期化（namespace設定）
+    if err := st.Initialize(ctx, namespace); err != nil {
+        return nil, nil, fmt.Errorf("failed to initialize store: %w", err)
+    }
 
-    // Handler
+    // 4. Services初期化
+    noteService := service.NewNoteService(emb, st, namespace)
+    configService := service.NewConfigService(configManager)
+    globalService := service.NewGlobalService(st, namespace)
+
+    // 5. JSON-RPC Handler初期化
     handler := jsonrpc.New(noteService, configService, globalService)
 
     cleanup := func() {
-        // Store等のクリーンアップ（必要に応じて）
+        st.Close()
     }
 
     return handler, cleanup, nil
