@@ -125,7 +125,8 @@ type GlobalConfig struct {
   "embedder": {
     "provider": "openai",
     "model": "text-embedding-3-small",
-    "dim": 0
+    "dim": 0,
+    "apiKey": "sk-..."
   },
   "store": {
     "type": "chroma"
@@ -136,6 +137,8 @@ type GlobalConfig struct {
   }
 }
 ```
+
+**注**: `embedder.apiKey` に OpenAI API キーを設定できます。
 
 **セキュリティ注意**: 設定ファイルにAPIキーを保存する場合は、ファイルのパーミッションを適切に設定してください（例: `chmod 600 ~/.local-mcp-memory/config.json`）。可能であれば環境変数での設定を推奨します。
 
