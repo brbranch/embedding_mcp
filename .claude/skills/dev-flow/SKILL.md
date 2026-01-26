@@ -145,6 +145,20 @@ Phase {N} Task {M}: {タスク名}
 
 Step 11 は複数のサブステップで構成される。詳細は「Step 11: リリースフロー詳細」を参照。
 
+- [ ] 11-1: フロー全体チェックリストを確認した
+- [ ] 11-2: 切り戻しが必要か判断した
+- [ ] 11-3: worktree を削除した（マージ前に実施）
+- [ ] 11-4: PR をマージした
+- [ ] 11-5: ローカルブランチを削除した
+- [ ] 11-5: **リモートブランチを削除した**（`git push origin --delete`）
+- [ ] 11-5: main を最新化した
+- [ ] 11-6: 進捗ファイルを更新してプッシュした
+- [ ] 11-7: GitHub Release を作成した
+- [ ] 11-8: スキップ報告をした（該当する場合）
+- [ ] 11-9: 完了通知を送信した
+
+**注**: 11-5はサブステップをまとめて実行するため同一番号。
+
 ---
 
 ## Step 11: リリースフロー詳細
@@ -167,6 +181,12 @@ Step 11 は複数のサブステップで構成される。詳細は「Step 11: 
 - [ ] Step 8: E2Eテストを実行した（または意図的スキップ）
 - [ ] Step 9: README更新を確認した
 - [ ] Step 10: 全体レビューを実行した ⚠️レビュー必須
+
+### リリース時の確認項目
+- [ ] worktree が削除された
+- [ ] PR がマージされた
+- [ ] ローカルブランチが削除された
+- [ ] **リモートブランチが削除された**（`git push origin --delete` で明示的に削除）
 
 ### 意図的スキップの記録
 スキップしたステップがあれば記録:
@@ -193,26 +213,37 @@ Step 11 は複数のサブステップで構成される。詳細は「Step 11: 
 - 切り戻し不要
 - スキップ理由を記録し、リリース完了後にユーザーに報告
 
-### 11-3. main へマージ
+### 11-3. worktree 削除（マージ前に実施）
+
+**重要**: `gh pr merge --delete-branch` はworktreeがあるとブランチ削除に失敗するため、先にworktreeを削除する。
+
+```bash
+# worktree 削除（--force で未コミット変更があっても削除）
+git worktree remove {worktreeパス} --force
+```
+
+### 11-4. main へマージ
 
 ```bash
 gh pr merge {PR番号} --squash --delete-branch
 ```
 
-### 11-4. ローカルクリーンアップ
+### 11-5. ブランチ削除 & main 最新化
 
 ```bash
-# worktree 削除
-git worktree remove {worktreeパス}
-
 # ローカルブランチ削除（残っていれば）
-git branch -d {ブランチ名}
+git branch -d {ブランチ名} 2>/dev/null || git branch -D {ブランチ名}
+
+# リモートブランチ削除（残っていれば）
+git push origin --delete {ブランチ名} 2>/dev/null || true
 
 # main を最新化
 git pull origin main
 ```
 
-### 11-5. 進捗ファイル更新 & プッシュ
+**注意**: `gh pr merge --delete-branch` でリモートブランチ削除が失敗することがあるため、明示的に `git push origin --delete` を実行する。
+
+### 11-6. 進捗ファイル更新 & プッシュ
 
 ```bash
 # 進捗ファイルを completed に更新
@@ -226,7 +257,7 @@ git commit -m "Complete Phase{N} Task{M}: {タスク名}"
 git push origin main
 ```
 
-### 11-6. GitHub Release 作成
+### 11-7. GitHub Release 作成
 
 ```bash
 # タグ名: v{phase}.{task}.0 （例: v1.1.0）
@@ -244,7 +275,7 @@ gh release create v{phase}.{task}.0 \
 "
 ```
 
-### 11-7. スキップ報告（該当する場合）
+### 11-8. スキップ報告（該当する場合）
 
 意図的にスキップしたステップがあれば、ユーザーに報告:
 
@@ -256,7 +287,7 @@ gh release create v{phase}.{task}.0 \
 これらは意図的なスキップであり、問題ありません。
 ```
 
-### 11-8. 完了通知
+### 11-9. 完了通知
 
 ```bash
 terminal-notifier -title "Dev Flow" -message "Phase{N} Task{M} 完了 (v{phase}.{task}.0)" -sound default
