@@ -107,13 +107,18 @@ echo '{"jsonrpc":"2.0","id":1,"method":"memory.add_note","params":{"projectId":"
 
 **場所**: VectorStoreセクション（L162）の「実装」の後（L192-193付近）
 
-**追加内容**:
+**実装状況の確認結果**:
+- `internal/store/chroma.go`: ChromaStoreはスタブ実装のみ（全メソッドが "not yet implemented" を返す）
+- `internal/store/memory.go`: MemoryStoreは完全実装済み（テスト用インメモリ）
+- 現在のデフォルトはMemoryStoreを使用
+
+**追加内容**（実装状況を反映）:
 ```markdown
-### Chromaのセットアップ
+### Chromaのセットアップ（将来実装予定）
 
-MCP Memory ServerはChromaをベクトルストアとして使用します。
+Chroma連携機能は現在開発中です。完成後は以下の方法で使用できます:
 
-**サーバーモード（推奨）:**
+**サーバーモード:**
 
 ```bash
 # Docker で起動
@@ -126,9 +131,9 @@ chroma run --host localhost --port 8000
 
 サーバー起動後、MCP Memory Serverは自動的に `localhost:8000` に接続します。
 
-**Embedded Mode:**
+**現在の状態:**
 
-Goアプリケーション内でChromaをインプロセスで動作させることも可能です（外部サーバー不要）。現在のデフォルト実装はMemoryStore（テスト用）を使用しています。
+現在はMemoryStore（インメモリ実装）を使用しています。これはテスト・開発用途向けで、サーバー再起動時にデータは失われます。本番環境ではChroma実装完成後に切り替えてください。
 ```
 
 ### Step 5: OpenAI APIキーのセキュリティ注意喚起を追加
@@ -143,7 +148,9 @@ Goアプリケーション内でChromaをインプロセスで動作させるこ
 ### Step 6: 全体の整理
 
 - セクション間の一貫性確認
-- 「開発状況」セクションの更新（開発完了に近いため）
+- 「開発状況」セクションの更新
+  - 変更前: 「現在開発中です。」
+  - 変更後: 「コア機能は実装済みです。以下は将来実装予定:」+ リスト（ChromaStore完全実装、Ollama embedder、SQLite VectorStore）
 
 ## テストケース
 
