@@ -82,19 +82,35 @@ allowed-tools: Bash, Read, Write, Edit
 ```markdown
 ## 検索タイミング
 
+**重要**: 全ての検索・取得操作で `projectId` は必須。
+
 ### パターンA: 仕様/方針/規約が関係する話題
 
-1. まず `search(groupId="global", topK=5)` で共通設定を検索
-2. 不足なら `search(groupId=null, topK=8)` で全group横断検索
+1. まず `search(projectId, groupId="global", topK=5)` で共通設定を検索
+2. 不足なら `search(projectId, groupId=null, topK=8)` で全group横断検索
 
 ### パターンB: 機能/タスクを進めるとき
 
-1. まず `search(groupId="feature-x", topK=5)` で該当機能の情報を検索
-2. 矛盾回避が必要なら `search(groupId="global", topK=3)` で共通設定も検索
+1. まず `search(projectId, groupId="feature-x", topK=5)` で該当機能の情報を検索
+2. 矛盾回避が必要なら `search(projectId, groupId="global", topK=3)` で共通設定も検索
 
 ### パターンC: 直近の状況が必要なとき
 
-- `list_recent(groupId指定 or null)` で最新のノートを取得
+- `list_recent(projectId, groupId指定 or null)` で最新のノートを取得
+
+### パターンD: 特定ノートを直接取得
+
+- `memory.get(projectId, id)` でIDを指定して取得
+
+### groupId未指定時の挙動
+
+- ユーザーがgroupIdを指定しない場合は `"global"` をデフォルトとする
+- 不明な場合はユーザーに確認（「globalでよいですか？それとも特定のfeature/task用ですか？」）
+
+### 検索フィルタオプション
+
+- `tags`: タグでフィルタ（AND検索、空配列/nullはフィルタなし）
+- `since`/`until`: 期間でフィルタ（UTC ISO8601、since <= createdAt < until）
 ```
 
 ### 2.7 保存タイミング定義
@@ -126,6 +142,13 @@ metadata に含める情報（将来の全文ingest拡張用）:
   - key: `global.memory.embedder.model`
 - **groupDefaults**: groupId命名ルール
   - key: `global.memory.groupDefaults`
+
+### 設定の変更（set_config）
+
+embedder設定を変更する場合:
+- `memory.set_config(embedder: { provider, model, ... })`
+- **注意**: store/pathsは再起動が必要なため変更不可
+- effectiveNamespace が返却される
 ```
 
 ### 2.8 矛盾検出と解決フロー
@@ -280,14 +303,22 @@ metadata に含める情報（将来の全文ingest拡張用）:
 | 10 | 矛盾解決 | 矛盾を解決するよう依頼 | supersededタグ付与 + 新規ノート作成 |
 | 11 | config取得 | 「memory設定を確認して」と依頼 | `memory.get_config` が呼ばれる |
 | 12 | config/global矛盾 | global設定とconfigに矛盾がある状態で確認 | 矛盾が明示され、同期が提案される |
+| 13 | 特定ノート取得 | 「さっき保存したノートをIDで取得して」と依頼 | `memory.get` が呼ばれ、該当ノートが返る |
+| 14 | 直近ノート取得 | 「最近のノートを見せて」と依頼 | `memory.list_recent` が呼ばれる |
+| 15 | config変更 | 「embedderをollamaに変更して」と依頼 | `memory.set_config` が呼ばれ、effectiveNamespaceが返る |
+| 16 | タグフィルタ検索 | 「decisionタグのノートを検索して」と依頼 | tags=["decision"]で検索される |
+| 17 | 期間フィルタ検索 | 「今日保存したノートを検索して」と依頼 | since/untilで期間指定検索される |
+| 18 | projectId canonical化 | `~/git/project` で保存→検索 | 絶対パスに正規化されて動作する |
+| 19 | groupIdバリデーション | 「groupId=@invalid」で保存 | バリデーションエラー |
 
 ### 4.3 エラーケース確認
 
 | # | 確認項目 | 操作 | 期待結果 |
 |---|---------|------|---------|
 | E1 | サーバー未起動 | サーバー停止状態で操作 | 適切なエラーメッセージ |
-| E2 | 不正なgroupId | 「groupId=@invalid」で保存 | バリデーションエラー |
-| E3 | 不正なglobal key | 「key=invalid」でupsert_global | エラー（"global."プレフィックス必須） |
+| E2 | 不正なglobal key | 「key=invalid」でupsert_global | エラー（"global."プレフィックス必須） |
+| E3 | projectId未指定 | projectIdなしで検索 | エラー（projectId必須） |
+| E4 | set_configでstore変更 | storeの設定を変更しようとする | エラー（再起動が必要） |
 
 ---
 
