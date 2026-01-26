@@ -134,6 +134,8 @@ chroma run --host localhost --port 8000
 **現在の状態:**
 
 現在はMemoryStore（インメモリ実装）を使用しています。これはテスト・開発用途向けで、サーバー再起動時にデータは失われます。本番環境ではChroma実装完成後に切り替えてください。
+
+**注**: Embedded mode（インプロセスでのChroma実行）は現在未対応です。
 ```
 
 ### Step 5: OpenAI APIキーのセキュリティ注意喚起を追加
