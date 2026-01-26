@@ -10,8 +10,8 @@ Claude Code から JSON-RPC 2.0 で呼び出せるローカル RAG メモリ基�
 
 - 会話メモ/仕様/ノートの保存と検索
 - プロジェクト単位・グループ単位でのメモ管理
-- OpenAI/Ollama による埋め込み生成
-- Chroma/SQLite によるベクトル検索
+- OpenAI による埋め込み生成（Ollama は将来実装予定）
+- MemoryStore（インメモリ）によるベクトル検索（Chroma/SQLite は将来実装予定）
 
 ## ビルド方法
 
@@ -33,13 +33,15 @@ go build ./cmd/mcp-memory
 
 ```bash
 # stdio transport（デフォルト）
+mcp-memory serve
+# または
 ./mcp-memory serve
 
-# または直接実行
+# 直接実行（ビルドなし）
 go run ./cmd/mcp-memory serve
 
 # HTTP transport
-./mcp-memory serve --transport http --port 8765
+mcp-memory serve --transport http --host 127.0.0.1 --port 8765
 
 # カスタム設定ファイル
 ./mcp-memory serve --config /path/to/config.json
@@ -123,7 +125,8 @@ type GlobalConfig struct {
   "embedder": {
     "provider": "openai",
     "model": "text-embedding-3-small",
-    "dim": 0
+    "dim": 0,
+    "apiKey": "sk-..."
   },
   "store": {
     "type": "chroma"
@@ -134,6 +137,10 @@ type GlobalConfig struct {
   }
 }
 ```
+
+**注**: `embedder.apiKey` に OpenAI API キーを設定できます。
+
+**セキュリティ注意**: 設定ファイルにAPIキーを保存する場合は、ファイルのパーミッションを適切に設定してください（例: `chmod 600 ~/.local-mcp-memory/config.json`）。可能であれば環境変数での設定を推奨します。
 
 ### 環境変数
 
@@ -158,6 +165,8 @@ projectIdは以下の順序で正規化されます:
 埋め込みのnamespaceは `{provider}:{model}:{dim}` 形式で自動生成されます。
 
 例: `openai:text-embedding-3-small:1536`
+
+**重要**: providerやmodelを変更すると、namespaceも変わります。これは異なる埋め込みモデル間での次元数（dim）の不一致を防ぐためです。古いnamespaceのデータはそのまま残りますが、新しいnamespaceからは検索されません。同じデータを新しいモデルで検索したい場合は、再度 `add_note` で追加してください。
 
 ## VectorStore
 
@@ -190,6 +199,29 @@ SearchOptions{
 
 - **MemoryStore**: テスト用インメモリ実装
 - **ChromaStore**: Chroma連携（実装予定）
+
+### Chromaのセットアップ（将来実装予定）
+
+Chroma連携機能は現在開発中です。完成後は以下の方法で使用できます:
+
+**サーバーモード:**
+
+```bash
+# Docker で起動
+docker run -d -p 8000:8000 chromadb/chroma
+
+# または pip でインストールして起動
+pip install chromadb
+chroma run --host localhost --port 8000
+```
+
+サーバー起動後、MCP Memory Serverは自動的に `localhost:8000` に接続します。
+
+**現在の状態:**
+
+現在はMemoryStore（インメモリ実装）を使用しています。これはテスト・開発用途向けで、サーバー再起動時にデータは失われます。本番環境ではChroma実装完成後に切り替えてください。
+
+**注**: Embedded mode（インプロセスでのChroma実行）は現在未対応です。
 
 ## Embedder
 
@@ -343,6 +375,26 @@ server := stdio.New(handler)
 err := server.Run(ctx)
 ```
 
+**コマンドライン例:**
+
+```bash
+# パイプでリクエスト送信
+echo '{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}' | ./mcp-memory serve
+
+# 複数リクエスト（1行1リクエスト）
+cat <<'EOF' | ./mcp-memory serve
+{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"memory.add_note","params":{"projectId":"~/test","text":"Hello"}}
+EOF
+```
+
+**改行を含むテキストの例:**
+
+```bash
+# text内の改行は \n でエスケープ（JSONの仕様通り）
+echo '{"jsonrpc":"2.0","id":1,"method":"memory.add_note","params":{"projectId":"~/test","text":"Line1\nLine2\nLine3"}}' | ./mcp-memory serve
+```
+
 **テスト実行:**
 
 ```bash
@@ -442,8 +494,8 @@ E2Eテストで検証される項目:
 
 ## 開発状況
 
-現在開発中です。
+コア機能は実装済みです。以下は将来実装予定:
 
----
-
-**NOTE**: 各タスク完了時に、該当機能の動作確認方法をこのREADMEに追記します。
+- **ChromaStore完全実装**: 現在はスタブのみ、本番環境向けChroma連携
+- **Ollama embedder**: ローカルLLMによる埋め込み生成
+- **SQLite VectorStore**: 軽量用途向けの組み込みベクトルストア
