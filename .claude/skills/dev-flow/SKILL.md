@@ -355,7 +355,7 @@ claude --model opus --agent .claude/agents/documenter.md -p "{指示}"
 ### GitHub Copilot（レビュー）
 
 ```bash
-copilot --model gpt-5.1-codex --add-dir . --allow-all-tools -p "{レビュープロンプト}"
+copilot --model gpt-5.2-codex --add-dir . --allow-all-tools -p "{レビュープロンプト}"
 ```
 
 **レビュープロンプトに必ず含めること**:
@@ -419,7 +419,7 @@ terminal-notifier -title "Dev Flow" -message "Phase{N} Task{M} 完了 (v{phase}.
 | 役割 | ファイル | モデル |
 |------|----------|--------|
 | 設計者 | `.claude/agents/designer.md` | Opus 4.5 |
-| レビュワー | `.claude/agents/reviewer.md` | Copilot GPT-5.1-Codex |
+| レビュワー | `.claude/agents/reviewer.md` | Copilot GPT-5.2-Codex |
 | テスト実装者 | `.claude/agents/test-implementer.md` | Sonnet 4.5 |
 | 実装者 | `.claude/agents/implementer.md` | Sonnet 4.5 |
 | テックリーダー | `.claude/agents/tech-leader.md` | Opus 4.5 |
