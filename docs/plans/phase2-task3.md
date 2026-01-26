@@ -178,6 +178,7 @@ func GenerateNamespace(provider, model string, dim int) string
 
 // ParseNamespace はnamespaceをprovider, model, dimに分解する
 // 不正な形式の場合はエラーを返す
+// dimは0以上の整数であること（負数の場合はエラー）
 func ParseNamespace(namespace string) (provider, model string, dim int, err error)
 ```
 
@@ -300,6 +301,7 @@ func GetOpenAIAPIKey(config *model.Config) string {
 | `TestParseNamespace_Valid` | 正しく分解される |
 | `TestParseNamespace_InvalidFormat` | 不正形式でエラー |
 | `TestParseNamespace_DimZero` | dim=0でも正常にパース |
+| `TestParseNamespace_NegativeDim` | 負のdimでエラー |
 
 ### 5.3 設定管理テスト (manager_test.go)
 
