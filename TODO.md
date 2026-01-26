@@ -200,9 +200,9 @@
 ### Phase 4: JSON-RPC層
 
 #### 7. JSON-RPCハンドラー (internal/jsonrpc)
-- [ ] JSON-RPC 2.0パーサー実装
-- [ ] method dispatcher実装
-- [ ] 各メソッドハンドラー登録（入出力仕様は embedded_spec.md #8 参照）
+- [x] JSON-RPC 2.0パーサー実装
+- [x] method dispatcher実装
+- [x] 各メソッドハンドラー登録（入出力仕様は embedded_spec.md #8 参照）
   - memory.add_note
   - memory.search (topK default=5)
   - memory.get
@@ -212,7 +212,7 @@
   - memory.set_config
   - memory.upsert_global
   - memory.get_global
-- [ ] エラーハンドリング
+- [x] エラーハンドリング
   - invalid params (-32602)
   - method not found (-32601)
   - internal error (-32603)

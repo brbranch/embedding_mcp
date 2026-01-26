@@ -1,0 +1,31 @@
+{
+  "phase": 4,
+  "task": 7,
+  "taskName": "JSON-RPCハンドラー (internal/jsonrpc)",
+  "currentStep": 11,
+  "status": "completed",
+  "branch": "feature/phase4-task7",
+  "worktree": "../embedding_mcp-phase4-task7",
+  "implPR": {
+    "number": 8,
+    "url": "https://github.com/brbranch/embedding_mcp/pull/8",
+    "status": "merged"
+  },
+  "startedAt": "2026-01-26T10:00:00Z",
+  "completedAt": "2026-01-26T11:10:00Z",
+  "skippedSteps": [
+    {"step": 7, "reason": "エスカレーション不要"},
+    {"step": 8, "reason": "E2Eテストは Phase 7 Task 11 で実施"}
+  ],
+  "history": [
+    {"step": 1, "action": "worktree作成", "completedAt": "2026-01-26T10:00:00Z"},
+    {"step": 2, "action": "実装計画作成", "completedAt": "2026-01-26T10:05:00Z"},
+    {"step": 3, "action": "設計レビューLGTM", "completedAt": "2026-01-26T10:15:00Z"},
+    {"step": 4, "action": "テストコード作成", "completedAt": "2026-01-26T10:25:00Z"},
+    {"step": 5, "action": "テストレビューLGTM", "completedAt": "2026-01-26T10:35:00Z"},
+    {"step": 6, "action": "本実装完了・PR作成", "completedAt": "2026-01-26T10:50:00Z"},
+    {"step": 9, "action": "README更新", "completedAt": "2026-01-26T10:55:00Z"},
+    {"step": 10, "action": "全体レビューLGTM", "completedAt": "2026-01-26T11:00:00Z"},
+    {"step": 11, "action": "リリース完了", "completedAt": "2026-01-26T11:10:00Z"}
+  ]
+}
