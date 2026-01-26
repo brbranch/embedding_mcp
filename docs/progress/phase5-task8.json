@@ -1,0 +1,31 @@
+{
+  "phase": 5,
+  "task": 8,
+  "taskName": "stdio transport (internal/transport/stdio)",
+  "currentStep": 11,
+  "status": "completed",
+  "branch": "feature/phase5-task8",
+  "worktree": "../embedding_mcp-phase5-task8",
+  "implPR": {
+    "number": 9,
+    "url": "https://github.com/brbranch/embedding_mcp/pull/9",
+    "status": "merged"
+  },
+  "startedAt": "2026-01-26T10:00:00Z",
+  "completedAt": "2026-01-26T10:40:00Z",
+  "skippedSteps": [
+    {"step": 7, "reason": "エスカレーション不要（全テストパス）"},
+    {"step": 8, "reason": "E2EテストはTask 10（CLI）と組み合わせて実施予定"}
+  ],
+  "history": [
+    {"step": 1, "action": "worktree作成", "completedAt": "2026-01-26T10:00:00Z"},
+    {"step": 2, "action": "実装計画作成", "completedAt": "2026-01-26T10:05:00Z"},
+    {"step": 3, "action": "設計レビューLGTM", "completedAt": "2026-01-26T10:10:00Z"},
+    {"step": 4, "action": "テストコード作成", "completedAt": "2026-01-26T10:15:00Z"},
+    {"step": 5, "action": "テストレビューLGTM", "completedAt": "2026-01-26T10:20:00Z"},
+    {"step": 6, "action": "本実装完了", "completedAt": "2026-01-26T10:25:00Z"},
+    {"step": 9, "action": "README更新", "completedAt": "2026-01-26T10:30:00Z"},
+    {"step": 10, "action": "全体レビューLGTM", "completedAt": "2026-01-26T10:35:00Z"},
+    {"step": 11, "action": "リリース完了", "completedAt": "2026-01-26T10:40:00Z"}
+  ]
+}

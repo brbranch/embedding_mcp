@@ -225,11 +225,11 @@
 ### Phase 5: Transport層
 
 #### 8. stdio transport (internal/transport/stdio)
-- [ ] NDJSON形式の入出力
+- [x] NDJSON形式の入出力
   - 1リクエスト = 1行を厳守（改行で区切る）
   - JSON内のtext等に含まれる改行は `\n` でエスケープ
   - 複数行にまたがるJSONは不可
-- [ ] graceful shutdown（SIGINT/SIGTERM対応）
+- [x] graceful shutdown（SIGINT/SIGTERM対応）
 
 **完了条件**: stdio経由でJSON-RPCリクエストを送り、正しいレスポンスが返ること
 
