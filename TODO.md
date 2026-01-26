@@ -249,12 +249,12 @@
 ### Phase 6: CLI
 
 #### 10. CLIエントリポイント (cmd/mcp-memory)
-- [ ] serveコマンド実装
-- [ ] --transport オプション（stdio/http）
-- [ ] --host, --port オプション（HTTP用）
-- [ ] -ldflags でデフォルトtransport切替対応
+- [x] serveコマンド実装
+- [x] --transport オプション（stdio/http）
+- [x] --host, --port オプション（HTTP用）
+- [x] -ldflags でデフォルトtransport切替対応
   - 例: `go build -ldflags "-X main.defaultTransport=http"`
-- [ ] シグナルハンドリング（SIGINT/SIGTERM）
+- [x] シグナルハンドリング（SIGINT/SIGTERM）
 
 **完了条件**: 以下が動作すること
 - `go run ./cmd/mcp-memory serve` でstdio起動
