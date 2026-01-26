@@ -39,6 +39,46 @@ go build ./cmd/mcp-memory
 ./mcp-memory serve --transport http --port 8765
 ```
 
+## データモデル
+
+### Note
+
+メモリノートの基本構造:
+
+```go
+type Note struct {
+    ID        string         // UUID
+    ProjectID string         // 正規化済みパス
+    GroupID   string         // 英数字、-、_のみ（"global"は予約値）
+    Title     *string        // nullable
+    Text      string         // 必須
+    Tags      []string       // 空配列可
+    Source    *string        // nullable
+    CreatedAt *string        // ISO8601 UTC（nullならサーバーが設定）
+    Metadata  map[string]any // nullable
+}
+```
+
+### GlobalConfig
+
+プロジェクト単位のグローバル設定:
+
+```go
+type GlobalConfig struct {
+    ID        string  // UUID
+    ProjectID string  // 正規化済みパス
+    Key       string  // "global."プレフィックス必須
+    Value     any     // 任意のJSON値
+    UpdatedAt *string // ISO8601 UTC
+}
+```
+
+標準キー:
+- `global.memory.embedder.provider`
+- `global.memory.embedder.model`
+- `global.memory.groupDefaults`
+- `global.project.conventions`
+
 ## 開発状況
 
 現在開発中です。
