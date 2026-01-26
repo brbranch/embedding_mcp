@@ -161,6 +161,56 @@ SearchOptions{
 - **MemoryStore**: テスト用インメモリ実装
 - **ChromaStore**: Chroma連携（実装予定）
 
+## Embedder
+
+### Embedder Interface
+
+テキストから埋め込みベクトルを生成する抽象インターフェース:
+
+```go
+type Embedder interface {
+    Embed(ctx context.Context, text string) ([]float32, error)
+    GetDimension() int  // 未確定時は0
+}
+```
+
+### DimUpdater
+
+初回埋め込み時に次元数を通知するコールバック:
+
+```go
+type DimUpdater interface {
+    UpdateDim(dim int) error
+}
+```
+
+### 実装
+
+- **OpenAIEmbedder**: OpenAI Embeddings API (`text-embedding-3-small`等)
+- **OllamaEmbedder**: Ollama連携（実装予定）
+- **LocalEmbedder**: ローカルモデル（実装予定）
+
+### Factory
+
+```go
+emb, err := embedder.NewEmbedder(cfg, apiKey, dimUpdater)
+```
+
+APIキー解決優先順位:
+1. `cfg.APIKey` (設定ファイル)
+2. `apiKey` パラメータ (環境変数)
+
+### エラー
+
+| エラー | 説明 |
+|--------|------|
+| `ErrAPIKeyRequired` | APIキー未設定 |
+| `ErrNotImplemented` | 未実装プロバイダ |
+| `ErrAPIRequestFailed` | APIリクエスト失敗 |
+| `ErrInvalidResponse` | 不正なAPIレスポンス |
+| `ErrEmptyEmbedding` | 空の埋め込み |
+| `ErrUnknownProvider` | 未知のプロバイダ |
+
 ## 開発状況
 
 現在開発中です。
