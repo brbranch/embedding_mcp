@@ -10,8 +10,8 @@ Claude Code から JSON-RPC 2.0 で呼び出せるローカル RAG メモリ基�
 
 - 会話メモ/仕様/ノートの保存と検索
 - プロジェクト単位・グループ単位でのメモ管理
-- OpenAI/Ollama による埋め込み生成
-- Chroma/SQLite によるベクトル検索
+- OpenAI による埋め込み生成（Ollama は将来実装予定）
+- MemoryStore（インメモリ）によるベクトル検索（Chroma/SQLite は将来実装予定）
 
 ## ビルド方法
 
@@ -33,13 +33,15 @@ go build ./cmd/mcp-memory
 
 ```bash
 # stdio transport（デフォルト）
+mcp-memory serve
+# または
 ./mcp-memory serve
 
-# または直接実行
+# 直接実行（ビルドなし）
 go run ./cmd/mcp-memory serve
 
 # HTTP transport
-./mcp-memory serve --transport http --host 127.0.0.1 --port 8765
+mcp-memory serve --transport http --host 127.0.0.1 --port 8765
 
 # カスタム設定ファイル
 ./mcp-memory serve --config /path/to/config.json
