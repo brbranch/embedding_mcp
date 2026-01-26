@@ -27,7 +27,8 @@ internal/model/
 ### 3.1 Note構造体 (note.go)
 
 ```go
-// Note はメモリノートを表す
+// Note はメモリノートを表す（内部データモデル）
+// 注: レスポンス用のDTO（namespaceを含む）はjsonrpc層で別途定義する
 type Note struct {
     ID        string         `json:"id"`                  // UUID形式
     ProjectID string         `json:"projectId"`           // 正規化済みパス
@@ -36,8 +37,8 @@ type Note struct {
     Text      string         `json:"text"`                // 必須
     Tags      []string       `json:"tags"`                // 空配列可
     Source    *string        `json:"source"`              // nullable
-    CreatedAt string         `json:"createdAt"`           // ISO8601 UTC形式
-    Metadata  map[string]any `json:"metadata,omitempty"`  // nullable、省略可
+    CreatedAt *string        `json:"createdAt"`           // ISO8601 UTC形式、nullable（nullならサーバー側で現在時刻設定）
+    Metadata  map[string]any `json:"metadata,omitempty"`  // nullable（JSON null許容）、省略可
 }
 ```
 
@@ -46,7 +47,8 @@ type Note struct {
 - `ProjectID`: 空文字不可
 - `GroupID`: 正規表現 `^[a-zA-Z0-9_-]+$` にマッチすること
 - `Text`: 空文字不可
-- `CreatedAt`: ISO8601 UTC形式（例: "2024-01-15T10:30:00Z"）
+- `CreatedAt`: nullableだが、値がある場合はISO8601 UTC形式（例: "2024-01-15T10:30:00Z"）
+- `Metadata`: null許容。JSONの`null`は`nil`として受理する
 
 **バリデーション関数**:
 ```go
@@ -59,17 +61,17 @@ func ValidateGroupID(groupID string) error
 ```go
 // GlobalConfig はプロジェクト単位のグローバル設定を表す
 type GlobalConfig struct {
-    ID        string `json:"id"`        // UUID形式
-    ProjectID string `json:"projectId"` // 正規化済みパス
-    Key       string `json:"key"`       // "global."プレフィックス必須
-    Value     any    `json:"value"`     // 任意のJSON値
-    UpdatedAt string `json:"updatedAt"` // ISO8601 UTC形式
+    ID        string  `json:"id"`        // UUID形式
+    ProjectID string  `json:"projectId"` // 正規化済みパス
+    Key       string  `json:"key"`       // "global."プレフィックス必須
+    Value     any     `json:"value"`     // 任意のJSON値
+    UpdatedAt *string `json:"updatedAt"` // ISO8601 UTC形式、nullable（nullならサーバー側で現在時刻設定）
 }
 ```
 
 **バリデーションルール**:
 - `Key`: "global."プレフィックス必須
-- `UpdatedAt`: ISO8601 UTC形式
+- `UpdatedAt`: nullableだが、値がある場合はISO8601 UTC形式
 
 **標準キー定数**:
 ```go
@@ -250,9 +252,10 @@ func NewInternalError(id any, message string) *ErrorResponse
 | TestRequest_JSONUnmarshal | JSONからRequestが正しくデシリアライズされる |
 | TestResponse_JSONMarshal | Responseが正しくJSONシリアライズされる |
 | TestErrorResponse_JSONMarshal | ErrorResponseが正しくJSONシリアライズされる |
+| TestErrorResponse_ParseError_IDNull | パース失敗時のErrorResponseでIDがnullになる |
 | TestNewResponse | NewResponseが正しいレスポンスを生成 |
 | TestNewErrorResponse | NewErrorResponseが正しいエラーレスポンスを生成 |
-| TestNewParseError | ParseErrorが-32700コードを持つ |
+| TestNewParseError | ParseErrorが-32700コードを持ち、IDがnullになる |
 | TestNewMethodNotFound | MethodNotFoundが-32601コードを持つ |
 | TestNewInvalidParams | InvalidParamsが-32602コードを持つ |
 | TestNewInternalError | InternalErrorが-32603コードを持つ |
@@ -301,7 +304,26 @@ Goでは `any` 型で受け取り、nilチェックで判定する。
 - #8 JSON-RPC methods
 - #10 JSON-RPC 2.0の厳密さ
 
-## 6. 完了条件
+## 6. 設計方針: モデルとDTOの分離
+
+`internal/model` パッケージは**内部データモデル**を定義する。
+API入出力用のDTO（Data Transfer Object）は別のパッケージで定義する:
+
+- **内部モデル** (`internal/model`): 永続化・ビジネスロジック用
+  - `Note`, `GlobalConfig`, `Config`
+  - `namespace` は持たない（サービス層で動的に算出）
+
+- **API DTO** (`internal/jsonrpc` または `internal/dto`):
+  - `NoteResponse`: `Note` + `Namespace` + `Score`（search用）
+  - `SearchResponse`: `Namespace` + `Results`
+  - `ListRecentResponse`: `Namespace` + `Items`
+
+この分離により:
+1. 内部モデルはシンプルに保てる
+2. API仕様変更時の影響範囲を限定できる
+3. 将来の拡張に柔軟に対応できる
+
+## 7. 完了条件
 
 ```bash
 go test ./internal/model/... -v
