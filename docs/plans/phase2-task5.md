@@ -140,7 +140,7 @@ func NewOpenAIEmbedder(apiKey string, opts ...OpenAIOption) (*OpenAIEmbedder, er
 | `embedding` 配列が空 | `ErrEmptyEmbedding` を返す |
 | context.Canceled | そのままcontext.Canceledを返す |
 | context.DeadlineExceeded | そのままcontext.DeadlineExceededを返す |
-| DimUpdater.UpdateDim失敗 | ログ出力のみ（embedは正常に返す） |
+| DimUpdater.UpdateDim失敗 | log.Printf (Warn相当) でログ出力のみ（embedは正常に返す） |
 
 ## 5. Stub実装
 
