@@ -2,6 +2,231 @@
 
 ローカルで動作する MCP メモリサーバー（Go実装）。会話メモ/仕様/ノートの埋め込み検索基盤。
 
+## これがあると何が嬉しいか
+
+### AIの「忘却」問題を解決
+
+Claude Code などのAIアシスタントは、セッションが終わると会話内容を忘れてしまいます。そのため：
+
+- 毎回同じ説明をする必要がある（「このプロジェクトはReactで...」）
+- 以前決めたルールや方針を覚えていない
+- 過去の議論で出た重要な決定事項が失われる
+
+このMCPメモリサーバーを導入すると、**AIがプロジェクトの文脈を覚え続けられる**ようになります。
+
+### 具体的なメリット
+
+| 課題 | 導入後 |
+|------|--------|
+| プロジェクトのコーディング規約を毎回説明 | 一度保存すれば自動で参照 |
+| 「前に話した機能Xの仕様って何だっけ？」 | セマンティック検索で即座に取得 |
+| チーム内で決めた用語の定義がブレる | 用語集をメモリに保存して統一 |
+| 過去の設計判断の理由が分からない | 決定事項と理由をセットで記録 |
+
+## AIが何をできるようになるか
+
+### 1. コンテキストを持った回答
+
+```
+ユーザー: 「認証機能を追加して」
+
+AIの内部動作:
+1. memory.search で過去の認証関連の議論を検索
+2. 「JWTを使う」「refresh tokenは7日」という過去の決定を発見
+3. その方針に沿った実装を提案
+```
+
+### 2. プロジェクト知識の蓄積
+
+AIは以下のような情報を自動的に保存・参照できます：
+
+- **仕様・設計**: 機能の詳細仕様、API設計、データモデル
+- **決定事項**: 技術選定の理由、アーキテクチャ判断
+- **規約・ルール**: コーディング規約、命名規則、レビュー基準
+- **用語集**: プロジェクト固有の用語定義
+- **注意点・落とし穴**: 過去にハマった問題とその解決策
+
+### 3. 複数プロジェクトの知識を分離管理
+
+`projectId` でプロジェクトごとに知識を分離。さらに `groupId` で：
+
+- `global`: 全体方針、コーディング規約、用語集
+- `feature-xxx`: 機能単位の仕様・議論
+- `task-xxx`: タスク単位の作業メモ
+
+### 4. セマンティック検索
+
+単純なキーワード検索ではなく、意味的に近いメモを検索できます：
+
+```
+検索クエリ: 「ユーザー認証の方法」
+ヒットするメモ: 「ログイン機能ではJWTを採用する」
+```
+
+## クイックスタート（導入方法）
+
+### 重要: MCP登録だけでは不十分
+
+MCPサーバーを登録すると、Claude Codeは `memory.add_note` や `memory.search` などのツールを**使える**ようになります。しかし、**いつ使うかは自発的に判断しません**。
+
+| 設定レベル | 効果 |
+|------------|------|
+| MCP登録のみ | ツールは使えるが、自発的には使わない |
+| MCP登録 + CLAUDE.md指示 | 指示に従って使うようになる |
+
+つまり、導入には以下の両方が必要です：
+1. MCPサーバーの登録（ツールを使えるようにする）
+2. CLAUDE.md への運用ルール追記（いつ使うかを指示する）
+
+---
+
+### Step 1: ビルド
+
+```bash
+git clone https://github.com/miistin/embedding_mcp.git
+cd embedding_mcp
+go build ./cmd/mcp-memory
+```
+
+### Step 2: OpenAI APIキーの設定
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+または設定ファイル（`~/.local-mcp-memory/config.json`）に記載：
+
+```json
+{
+  "embedder": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "apiKey": "sk-..."
+  }
+}
+```
+
+### Step 3: 動作確認（HTTP モード）
+
+```bash
+# サーバー起動
+./mcp-memory serve --transport http --port 8765
+```
+
+別ターミナルで動作確認：
+
+```bash
+curl -X POST http://localhost:8765/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}'
+```
+
+レスポンスが返ってくれば成功です。
+
+### Step 4: Claude Codeへの MCP 登録
+
+Claude Code の設定ファイル `~/.claude/settings.json` に追加：
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "command": "/path/to/mcp-memory",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+`/path/to/mcp-memory` は実際のパスに置き換えてください（例: `/Users/yourname/embedding_mcp/mcp-memory`）。
+
+### Step 5: CLAUDE.md に運用ルールを追記（重要）
+
+プロジェクトの `CLAUDE.md` に以下を追記します。これにより、Claude Codeが適切なタイミングでメモリを使うようになります：
+
+```markdown
+## Memory MCP 運用ルール
+
+MCPサーバー「memory」が利用可能。以下のルールに従って使用すること。
+
+### 検索タイミング
+- セッション開始時、プロジェクトの方針・規約が関係する話題では:
+  → memory.search(projectId=カレントディレクトリ, groupId="global", topK=5)
+- 特定機能の実装中:
+  → memory.search(projectId=カレントディレクトリ, groupId="feature-xxx", topK=5)
+
+### 保存タイミング
+- 重要な決定・仕様が確定したら:
+  → memory.add_note で保存
+- 保存すべき情報の例:
+  - 技術選定の決定と理由
+  - API設計・データモデル
+  - コーディング規約
+  - 用語の定義
+  - ハマった問題と解決策
+
+### groupId の使い分け
+- "global": 全体方針、規約、用語集
+- "feature-xxx": 機能単位の仕様（例: feature-auth, feature-payment）
+- "task-xxx": タスク単位の作業メモ
+
+### tags の付け方
+- ["仕様"], ["決定"], ["規約"], ["用語"], ["注意点"] など
+```
+
+### Step 6: 使い始める
+
+Claude Code を再起動し、以下のように使えます：
+
+```
+ユーザー: 「このプロジェクトのコーディング規約を覚えておいて」
+AI: memory.add_note で規約を保存
+
+ユーザー: 「認証機能について過去に話したことある？」
+AI: memory.search で関連メモを検索して回答
+```
+
+## ユースケース例
+
+### ケース1: プロジェクト規約の記録
+
+```json
+// memory.add_note
+{
+  "projectId": "~/myproject",
+  "groupId": "global",
+  "title": "コーディング規約",
+  "text": "1. 変数名はcamelCase\n2. 関数は単一責任\n3. エラーは早期return",
+  "tags": ["規約", "コーディング"]
+}
+```
+
+### ケース2: 機能仕様の保存
+
+```json
+// memory.add_note
+{
+  "projectId": "~/myproject",
+  "groupId": "feature-auth",
+  "title": "認証機能の仕様",
+  "text": "JWTを使用。access tokenは1時間、refresh tokenは7日。",
+  "tags": ["仕様", "認証"]
+}
+```
+
+### ケース3: 過去の議論を検索
+
+```json
+// memory.search
+{
+  "projectId": "~/myproject",
+  "query": "データベースの選定理由",
+  "topK": 5
+}
+```
+
+---
+
 ## 概要
 
 Claude Code から JSON-RPC 2.0 で呼び出せるローカル RAG メモリ基盤を提供します。
@@ -47,7 +272,85 @@ mcp-memory serve --transport http --host 127.0.0.1 --port 8765
 ./mcp-memory serve --config /path/to/config.json
 ```
 
-### CLI オプション
+### ワンショット検索コマンド（v9.13.0～）
+
+MCPサーバーを起動せずに、コマンドラインから直接検索を実行できます。SessionStart Hookとの連携に最適です。
+
+```bash
+# 基本的な使い方
+mcp-memory search -p /path/to/project "検索クエリ"
+
+# グループとタグでフィルタ
+mcp-memory search -p ~/myproject -g global -k 10 "コーディング規約"
+
+# JSON形式で出力（スクリプト連携用）
+mcp-memory search -p /path/to/project -f json "API設計"
+
+# stdinからクエリを読み取り（セキュリティ向上）
+echo "機密クエリ" | mcp-memory search -p /path/to/project --stdin
+```
+
+**search オプション:**
+
+| オプション | 短縮形 | デフォルト | 説明 |
+|------------|--------|------------|------|
+| `--project` | `-p` | (必須) | プロジェクトID/パス |
+| `--group` | `-g` | (全グループ) | グループID |
+| `--top-k` | `-k` | 5 | 取得件数 |
+| `--tags` | - | - | タグフィルタ（カンマ区切り） |
+| `--format` | `-f` | text | 出力形式: text, json |
+| `--config` | `-c` | ~/.local-mcp-memory/config.json | 設定ファイルパス |
+| `--stdin` | - | false | stdinからクエリを読み取る |
+
+**出力例（text形式）:**
+```
+[1] コーディング規約 (score: 0.92)
+    変数名はcamelCase、関数は単一責任...
+    tags: 規約, コーディング
+
+[2] API設計方針 (score: 0.85)
+    RESTful APIを採用、エンドポイントは...
+    tags: 仕様, API
+```
+
+**SessionStart Hookでの使用例:**
+
+`~/.claude/settings.json`:
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/memory-init.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`~/.claude/hooks/memory-init.sh`:
+```bash
+#!/bin/bash
+RESULTS=$(/path/to/mcp-memory search \
+  --project "$CLAUDE_PROJECT_DIR" \
+  --group global \
+  --top-k 5 \
+  "プロジェクト方針 規約 コーディング")
+
+if [ -n "$RESULTS" ]; then
+  echo "## プロジェクトメモリから取得した情報"
+  echo ""
+  echo "$RESULTS"
+fi
+exit 0
+```
+
+### serve CLI オプション
 
 | オプション | 短縮形 | デフォルト | 説明 |
 |------------|--------|------------|------|
