@@ -1,5 +1,4 @@
 """MCP Memory Client - HTTP JSON-RPC 2.0 client."""
-import re
 from datetime import datetime
 from typing import Any
 
@@ -26,13 +25,34 @@ def _to_camel_case(snake_str: str) -> str:
     return components[0] + "".join(x.title() for x in components[1:])
 
 
-def _convert_keys_to_camel(data: dict[str, Any]) -> dict[str, Any]:
-    """Convert all dict keys from snake_case to camelCase recursively."""
+def _convert_keys_to_camel(
+    data: dict[str, Any], skip_keys: set[str] | None = None
+) -> dict[str, Any]:
+    """Convert dict keys from snake_case to camelCase recursively.
+
+    Args:
+        data: Dictionary to convert
+        skip_keys: Keys whose values should not be converted (e.g., "metadata")
+
+    Returns:
+        Dictionary with camelCase keys
+    """
+    if skip_keys is None:
+        skip_keys = {"metadata", "value"}  # Don't convert user-provided data
+
     result = {}
     for key, value in data.items():
         camel_key = _to_camel_case(key)
-        if isinstance(value, dict):
-            result[camel_key] = _convert_keys_to_camel(value)
+        if key in skip_keys:
+            # Keep value as-is (user-provided data)
+            result[camel_key] = value
+        elif isinstance(value, dict):
+            result[camel_key] = _convert_keys_to_camel(value, skip_keys)
+        elif isinstance(value, list):
+            result[camel_key] = [
+                _convert_keys_to_camel(item, skip_keys) if isinstance(item, dict) else item
+                for item in value
+            ]
         else:
             result[camel_key] = value
     return result
@@ -109,7 +129,10 @@ class MCPMemoryClient:
         except httpx.HTTPStatusError as e:
             raise MCPMemoryError(f"HTTP error: {e}") from e
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise MCPMemoryError(f"Invalid JSON response: {e}") from e
 
         if "error" in data:
             error = data["error"]

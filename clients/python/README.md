@@ -237,6 +237,12 @@ except MCPMemoryError as e:
     print(f"Error: {e}")
 ```
 
+## Security Considerations
+
+- **API Key handling**: The `api_key` parameter in `set_config()` is sent to the server in plain text. Do not log or expose it.
+- **base_url validation**: This client defaults to `http://localhost:8765`. Connecting to external URLs is the user's responsibility. Ensure the server is trusted.
+- **HTTPS**: For production use with external servers, always use HTTPS to encrypt communication.
+
 ## Development
 
 ```bash
