@@ -16,8 +16,9 @@ type AddNoteRequest struct {
 
 // AddNoteResponse はノート追加レスポンス
 type AddNoteResponse struct {
-	ID        string
-	Namespace string
+	ID                 string
+	Namespace          string
+	CanonicalProjectID string
 }
 
 // SearchRequest は検索リクエスト
