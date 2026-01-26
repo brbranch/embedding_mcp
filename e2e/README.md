@@ -65,7 +65,8 @@ E2Eテストはビルドタグ `//go:build e2e` で分離されています。
 
 | テストケース | 検証内容 |
 |-------------|---------|
-| `TestE2E_ProjectID_TildeExpansion` | projectIDの~展開（将来実装時に有効化） |
+| `TestE2E_ProjectID_TildeExpansion` | projectIDの~展開と正規化 |
+| `TestE2E_ProjectID_Consistency` | 同一パスの正規化一貫性 |
 | `TestE2E_AddNote_GlobalGroup` | global groupへのノート追加 |
 | `TestE2E_AddNote_FeatureGroup` | feature groupへのノート追加 |
 | `TestE2E_Search_WithGroupID` | groupIDフィルタ付き検索 |
@@ -81,9 +82,9 @@ E2Eテストはビルドタグ `//go:build e2e` で分離されています。
 
 ### 現在未検証の項目
 
-- **projectID正規化**: サービス層での実装が確認できなかったため、テストではコメントアウト済み
 - **transport層**: stdio/HTTP transportは別途テスト済み（ここではテストしない）
 - **実際のEmbedder API**: MockEmbedderを使用するため、OpenAI API等の実APIは呼ばれない
+- **Search/ListRecentのprojectID正規化**: 現在はadd_noteのみで正規化が実行される
 
 ### 将来の拡張
 
