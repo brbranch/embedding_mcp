@@ -116,13 +116,34 @@ func TestE2E_ProjectID_TildeExpansion(t *testing.T) {
     resp := callAddNote(t, h, "~/tmp/demo", "global", "test note")
 
     // レスポンスにはcanonical化されたprojectIdが返るべき
-    // （例: /Users/xxx/tmp/demo）
-    // - "~" が展開されていること
-    // - 絶対パスであること
+    // 検証条件（環境依存を考慮し緩い判定）:
+    // - "~" が展開されていること（先頭が"~"でない）
+    // - 絶対パスであること（先頭が"/"）
+    assert.NotEmpty(t, resp.ID)
+    assert.True(t, strings.HasPrefix(resp.CanonicalProjectID, "/"),
+        "projectIDは絶対パスであるべき")
+    assert.False(t, strings.Contains(resp.CanonicalProjectID, "~"),
+        "~は展開されているべき")
 }
 ```
 
 **注意:** 現在の実装を確認したところ、projectIDの正規化はサービス層で行われる設計だが、実際の呼び出しコードがない可能性がある。実装時に確認し、必要であればサービス層に正規化処理を追加する。
+
+### 5.1.1 TestE2E_Search_ProjectIDRequired
+
+```go
+func TestE2E_Search_ProjectIDRequired(t *testing.T) {
+    h := setupTestHandler(t)
+
+    // projectId なしで検索 → invalid params エラー (-32602)
+    resp := callSearchRaw(t, h, "", nil, "query")
+
+    assert.NotNil(t, resp.Error)
+    assert.Equal(t, jsonrpc.ErrCodeInvalidParams, resp.Error.Code)
+    // エラーメッセージに"projectId"が含まれることを確認
+    assert.Contains(t, resp.Error.Message, "projectId")
+}
+```
 
 ### 5.2 TestE2E_AddNote_GlobalGroup / FeatureGroup
 
@@ -202,6 +223,22 @@ func TestE2E_Global_EmbedderProvider(t *testing.T) {
     assert.Equal(t, "openai", getResp.Value)
 }
 
+func TestE2E_Global_EmbedderModel(t *testing.T) {
+    h := setupTestHandler(t)
+    projectID := "/test/project"
+
+    // upsert
+    upsertResp := callUpsertGlobal(t, h, projectID,
+        "global.memory.embedder.model", "text-embedding-3-small")
+    assert.True(t, upsertResp.OK)
+
+    // get
+    getResp := callGetGlobal(t, h, projectID,
+        "global.memory.embedder.model")
+    assert.True(t, getResp.Found)
+    assert.Equal(t, "text-embedding-3-small", getResp.Value)
+}
+
 func TestE2E_Global_GroupDefaults(t *testing.T) {
     h := setupTestHandler(t)
     projectID := "/test/project"
@@ -219,6 +256,26 @@ func TestE2E_Global_GroupDefaults(t *testing.T) {
         "global.memory.groupDefaults")
     assert.True(t, getResp.Found)
     // map比較
+    resultMap, ok := getResp.Value.(map[string]any)
+    assert.True(t, ok)
+    assert.Equal(t, "feature-", resultMap["featurePrefix"])
+    assert.Equal(t, "task-", resultMap["taskPrefix"])
+}
+
+func TestE2E_Global_ProjectConventions(t *testing.T) {
+    h := setupTestHandler(t)
+    projectID := "/test/project"
+
+    // upsert（日本語文字列）
+    upsertResp := callUpsertGlobal(t, h, projectID,
+        "global.project.conventions", "文章")
+    assert.True(t, upsertResp.OK)
+
+    // get
+    getResp := callGetGlobal(t, h, projectID,
+        "global.project.conventions")
+    assert.True(t, getResp.Found)
+    assert.Equal(t, "文章", getResp.Value)
 }
 
 func TestE2E_Global_InvalidKeyPrefix(t *testing.T) {
@@ -229,7 +286,7 @@ func TestE2E_Global_InvalidKeyPrefix(t *testing.T) {
     resp := callUpsertGlobalRaw(t, h, projectID,
         "memory.embedder.provider", "openai")
 
-    assert.Equal(t, model.ErrCodeInvalidKeyPrefix, resp.Error.Code)
+    assert.Equal(t, jsonrpc.ErrCodeInvalidParams, resp.Error.Code)
 }
 ```
 
