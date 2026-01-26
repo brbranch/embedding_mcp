@@ -236,11 +236,11 @@
 ---
 
 #### 9. HTTP transport (internal/transport/http)
-- [ ] POST /rpc エンドポイント
-- [ ] CORS設定
+- [x] POST /rpc エンドポイント
+- [x] CORS設定
   - 設定ファイルで許可オリジン指定可能
   - デフォルトはCORS無効（localhost直接アクセスのみ）
-- [ ] graceful shutdown
+- [x] graceful shutdown
 
 **完了条件**: `curl -X POST http://localhost:8765/rpc` でJSON-RPCが動作すること
 
