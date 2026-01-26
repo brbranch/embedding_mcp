@@ -95,12 +95,17 @@ type UpdateParams struct {
 // - キーが存在しない → フィールドを変更しない
 // - null → フィールドをnullにクリアする（title, source, metadataのみ）
 // この区別を実現するため、json.RawMessageを使用してパース時に判定する
+//
+// groupIdについて:
+// - groupIdは必須フィールドのため、nullでのクリアは不可
+// - groupIdがnullの場合はInvalidParams（groupId is required）エラー
+// - 空文字の場合も同様にInvalidParams
 type PatchParams struct {
     Title    json.RawMessage `json:"title,omitempty"`    // 存在しない/null/string
     Text     *string         `json:"text,omitempty"`     // 存在しない/string（nullはtext必須違反）
     Tags     *[]string       `json:"tags,omitempty"`
     Source   json.RawMessage `json:"source,omitempty"`   // 存在しない/null/string
-    GroupID  *string         `json:"groupId,omitempty"`
+    GroupID  *string         `json:"groupId,omitempty"`  // 存在しない/string（nullは不可）
     Metadata json.RawMessage `json:"metadata,omitempty"` // 存在しない/null/object
 }
 
@@ -247,6 +252,7 @@ serviceから返されるエラーをJSON-RPCエラーコードに変換:
     - since/until不正形式（memory.search） → InvalidParams
     - updatedAt不正形式（memory.upsert_global） → InvalidParams
     - memory.updateでtitle/source/metadataをnullでクリア → 正常に更新される
+    - memory.updateでgroupIdをnull → InvalidParams
     - set_config で embedder未指定 → {ok: true}が返る（変更なし）
 
 ## 実装順序
