@@ -132,7 +132,7 @@ func TestCanonicalizeProjectID_AlreadyAbsolute(t *testing.T) {
 // TestExpandTilde_Valid は有効なチルダパスが展開されることをテスト
 func TestExpandTilde_Valid(t *testing.T) {
 	path := "~/test/path"
-	expanded, err := expandTilde(path)
+	expanded, err := ExpandTilde(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestExpandTilde_Valid(t *testing.T) {
 // TestExpandTilde_NoTilde はチルダがないパスがそのまま返されることをテスト
 func TestExpandTilde_NoTilde(t *testing.T) {
 	path := "/absolute/path"
-	expanded, err := expandTilde(path)
+	expanded, err := ExpandTilde(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestExpandTilde_NoTilde(t *testing.T) {
 // TestExpandTilde_TildeOnly はチルダのみのパスが展開されることをテスト
 func TestExpandTilde_TildeOnly(t *testing.T) {
 	path := "~"
-	expanded, err := expandTilde(path)
+	expanded, err := ExpandTilde(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -179,29 +179,18 @@ func TestExpandTilde_TildeOnly(t *testing.T) {
 	}
 }
 
-// TestExpandTilde_TildeUser は~user形式が未対応であることをテスト
+// TestExpandTilde_TildeUser は~user形式が展開されないことをテスト
 func TestExpandTilde_TildeUser(t *testing.T) {
 	path := "~otheruser/path"
-	expanded, err := expandTilde(path)
+	expanded, err := ExpandTilde(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// ~user形式は未対応なのでそのまま返される想定
-	// もしくはエラーを返す実装もありうる
-	// ここでは仕様に応じて調整
-	if expanded == path {
-		// そのまま返される実装
-		return
+	// ~user形式は未対応なのでそのまま返される
+	if expanded != path {
+		t.Errorf("expected %q (unchanged), got %q", path, expanded)
 	}
-
-	// もしくはホームディレクトリ展開される実装
-	home, _ := os.UserHomeDir()
-	if filepath.HasPrefix(expanded, home) {
-		return
-	}
-
-	t.Errorf("unexpected result for ~user format: %q", expanded)
 }
 
 // TestGetDefaultConfigPath はデフォルト設定ファイルパスが取得できることをテスト

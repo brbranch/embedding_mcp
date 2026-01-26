@@ -46,7 +46,7 @@ func TestGenerateNamespace_WithDim(t *testing.T) {
 	}
 }
 
-// TestGenerateNamespace_DimZero は次元数0の場合にdimを含まないnamespaceが生成されることをテスト
+// TestGenerateNamespace_DimZero は次元数0の場合も0を含むnamespaceが生成されることをテスト
 func TestGenerateNamespace_DimZero(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -55,16 +55,16 @@ func TestGenerateNamespace_DimZero(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "openai without dim",
+			name:     "openai with dim 0",
 			provider: "openai",
 			model:    "text-embedding-3-small",
-			expected: "openai:text-embedding-3-small",
+			expected: "openai:text-embedding-3-small:0",
 		},
 		{
-			name:     "ollama without dim",
+			name:     "ollama with dim 0",
 			provider: "ollama",
 			model:    "nomic-embed-text",
-			expected: "ollama:nomic-embed-text",
+			expected: "ollama:nomic-embed-text:0",
 		},
 	}
 
@@ -105,11 +105,11 @@ func TestParseNamespace_Valid(t *testing.T) {
 			expectedDim:      1536,
 		},
 		{
-			name:             "without dim",
-			namespace:        "ollama:nomic-embed-text",
+			name:             "ollama with dim",
+			namespace:        "ollama:nomic-embed-text:768",
 			expectedProvider: "ollama",
 			expectedModel:    "nomic-embed-text",
-			expectedDim:      0,
+			expectedDim:      768,
 		},
 		{
 			name:             "local provider",
@@ -163,6 +163,14 @@ func TestParseNamespace_InvalidFormat(t *testing.T) {
 		{
 			name:      "no separator",
 			namespace: "openaimodel1536",
+		},
+		{
+			name:      "dim is not a number",
+			namespace: "openai:model:abc",
+		},
+		{
+			name:      "only two parts without dim",
+			namespace: "openai:model",
 		},
 	}
 
