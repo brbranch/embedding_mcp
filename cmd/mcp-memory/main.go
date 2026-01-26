@@ -33,10 +33,75 @@ type Options struct {
 }
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	var err error
+	switch os.Args[1] {
+	case "serve":
+		// 既存の run() フローを使用
+		err = run(os.Args[1:])
+	case "search":
+		err = runSearchCmd(os.Args[2:])
+	case "version", "-v", "--version":
+		printVersion()
+		return
+	case "help", "-h", "--help":
+		printUsage()
+		return
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		printUsage()
+		os.Exit(1)
+	}
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// printUsage prints the usage information
+func printUsage() {
+	fmt.Println(`mcp-memory - Local MCP Memory Server
+
+Usage:
+  mcp-memory <command> [options]
+
+Commands:
+  serve     Start the MCP server (stdio or HTTP)
+  search    Search notes (oneshot command)
+  version   Print version information
+  help      Print this help message
+
+Serve Options:
+  -t, --transport string   Transport type: stdio, http (default: stdio)
+  --host string            HTTP host (default: 127.0.0.1)
+  -p, --port int           HTTP port (default: 8765)
+  -c, --config string      Config file path
+
+Search Options:
+  -p, --project string     Project ID/path (required)
+  -g, --group string       Group ID (optional, search all groups if omitted)
+  -k, --top-k int          Number of results (default: 5)
+  --tags string            Tag filter (comma-separated)
+  -f, --format string      Output format: text, json (default: text)
+  -c, --config string      Config file path
+  --stdin                  Read query from stdin
+
+Examples:
+  mcp-memory serve
+  mcp-memory serve -t http -p 8080
+  mcp-memory search -p /path/to/project "search query"
+  mcp-memory search -p ~/project -g global -k 10 "query"
+  echo "query" | mcp-memory search -p /path/to/project --stdin`)
+}
+
+// printVersion prints the version information
+func printVersion() {
+	fmt.Printf("mcp-memory version %s\n", version)
 }
 
 // run は実際の処理を行う（テスト容易性のため分離）
