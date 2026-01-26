@@ -116,13 +116,13 @@
   - source (nullable)
   - createdAt (ISO8601 UTC、nullならサーバー側で現在時刻設定)
   - metadata (map[string]any、SQLiteではJSONカラム)
-- [ ] GlobalConfig構造体（id, projectId, key, value, updatedAt）
-- [ ] Config構造体
+- [x] GlobalConfig構造体（id, projectId, key, value, updatedAt）
+- [x] Config構造体
   - transportDefaults: { defaultTransport: string }
   - embedder: { provider, model, dim, baseUrl?, apiKey? }
   - store: { type, path?, url? }
   - paths: { configPath, dataDir }
-- [ ] JSON-RPC 2.0 Request/Response/Error構造体
+- [x] JSON-RPC 2.0 Request/Response/Error構造体
   - request: { jsonrpc: "2.0", id, method, params }
   - response: result または error
   - error: { code, message, data }
