@@ -8,12 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/brbranch/embedding_mcp/internal/config"
-	"github.com/brbranch/embedding_mcp/internal/embedder"
+	"github.com/brbranch/embedding_mcp/internal/bootstrap"
 	"github.com/brbranch/embedding_mcp/internal/jsonrpc"
-	"github.com/brbranch/embedding_mcp/internal/model"
-	"github.com/brbranch/embedding_mcp/internal/service"
-	"github.com/brbranch/embedding_mcp/internal/store"
 	"github.com/brbranch/embedding_mcp/internal/transport/http"
 	"github.com/brbranch/embedding_mcp/internal/transport/stdio"
 )
@@ -33,10 +29,76 @@ type Options struct {
 }
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	var err error
+
+	// 引数なしの場合はserveをデフォルト実行
+	if len(os.Args) < 2 {
+		err = run([]string{})
+	} else {
+		switch os.Args[1] {
+		case "serve":
+			// 既存の run() フローを使用
+			err = run(os.Args[1:])
+		case "search":
+			err = runSearchCmd(os.Args[2:])
+		case "version", "-v", "--version":
+			printVersion()
+			return
+		case "help", "-h", "--help":
+			printUsage()
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+			printUsage()
+			os.Exit(1)
+		}
+	}
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// printUsage prints the usage information
+func printUsage() {
+	fmt.Println(`mcp-memory - Local MCP Memory Server
+
+Usage:
+  mcp-memory <command> [options]
+
+Commands:
+  serve     Start the MCP server (stdio or HTTP)
+  search    Search notes (oneshot command)
+  version   Print version information
+  help      Print this help message
+
+Serve Options:
+  -t, --transport string   Transport type: stdio, http (default: stdio)
+  --host string            HTTP host (default: 127.0.0.1)
+  -p, --port int           HTTP port (default: 8765)
+  -c, --config string      Config file path
+
+Search Options:
+  -p, --project string     Project ID/path (required)
+  -g, --group string       Group ID (optional, search all groups if omitted)
+  -k, --top-k int          Number of results (default: 5)
+  --tags string            Tag filter (comma-separated)
+  -f, --format string      Output format: text, json (default: text)
+  -c, --config string      Config file path
+  --stdin                  Read query from stdin
+
+Examples:
+  mcp-memory serve
+  mcp-memory serve -t http -p 8080
+  mcp-memory search -p /path/to/project "search query"
+  mcp-memory search -p ~/project -g global -k 10 "query"
+  echo "query" | mcp-memory search -p /path/to/project --stdin`)
+}
+
+// printVersion prints the version information
+func printVersion() {
+	fmt.Printf("mcp-memory version %s\n", version)
 }
 
 // run は実際の処理を行う（テスト容易性のため分離）
@@ -65,12 +127,19 @@ func parseFlags(args []string) (*Options, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Config file path")
 	fs.StringVar(&opts.ConfigPath, "c", "", "Config file path (shorthand)")
 
-	// serveサブコマンド確認
-	if len(args) == 0 || args[0] != "serve" {
+	// 空配列の場合はserveをデフォルトとして扱う
+	// serveサブコマンド確認（引数なしまたは"serve"で始まる場合のみ許可）
+	var flagArgs []string
+	if len(args) == 0 {
+		// 引数なし: デフォルトでserve
+		flagArgs = []string{}
+	} else if args[0] == "serve" {
+		flagArgs = args[1:]
+	} else {
 		return nil, fmt.Errorf("usage: mcp-memory serve [options]")
 	}
 
-	if err := fs.Parse(args[1:]); err != nil {
+	if err := fs.Parse(flagArgs); err != nil {
 		return nil, err
 	}
 
@@ -102,23 +171,15 @@ func setupSignalHandler() (context.Context, context.CancelFunc) {
 
 // runServe はserveコマンドを実行
 func runServe(ctx context.Context, opts *Options) error {
-	// 設定ロード
-	configManager, err := config.NewManager(opts.ConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to create config manager: %w", err)
-	}
-	if err := configManager.Load(); err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	cfg := configManager.GetConfig()
-
-	// コンポーネント初期化
-	handler, cleanup, err := initComponents(ctx, cfg, configManager)
+	// bootstrap.Initializeを使用して共通初期化ロジックを実行
+	services, cleanup, err := bootstrap.Initialize(ctx, opts.ConfigPath)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
+
+	// JSON-RPC Handler初期化
+	handler := jsonrpc.New(services.NoteService, services.ConfigService, services.GlobalService)
 
 	// transport起動
 	switch opts.Transport {
@@ -136,51 +197,4 @@ func runServe(ctx context.Context, opts *Options) error {
 	default:
 		return fmt.Errorf("unknown transport: %s", opts.Transport)
 	}
-}
-
-// initComponents は依存コンポーネントを初期化
-func initComponents(ctx context.Context, cfg *model.Config, configManager *config.Manager) (*jsonrpc.Handler, func(), error) {
-	// namespace生成
-	namespace := config.GenerateNamespace(cfg.Embedder.Provider, cfg.Embedder.Model, cfg.Embedder.Dim)
-
-	// 1. Embedder初期化（dimUpdater経由でManager更新）
-	emb, err := embedder.NewEmbedder(&cfg.Embedder, os.Getenv("OPENAI_API_KEY"), configManager)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create embedder: %w", err)
-	}
-
-	// 2. Store初期化（タイプに応じて）
-	var st store.Store
-	switch cfg.Store.Type {
-	case "chroma":
-		url := "http://localhost:8000"
-		if cfg.Store.URL != nil && *cfg.Store.URL != "" {
-			url = *cfg.Store.URL
-		}
-		st, err = store.NewChromaStore(url)
-	default:
-		st = store.NewMemoryStore() // テスト・フォールバック用
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create store: %w", err)
-	}
-
-	// 3. Store初期化（namespace設定）
-	if err := st.Initialize(ctx, namespace); err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize store: %w", err)
-	}
-
-	// 4. Services初期化
-	noteService := service.NewNoteService(emb, st, namespace)
-	configService := service.NewConfigService(configManager)
-	globalService := service.NewGlobalService(st, namespace)
-
-	// 5. JSON-RPC Handler初期化
-	handler := jsonrpc.New(noteService, configService, globalService)
-
-	cleanup := func() {
-		st.Close()
-	}
-
-	return handler, cleanup, nil
 }
