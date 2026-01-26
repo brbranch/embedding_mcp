@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/brbranch/embedding_mcp/internal/config"
@@ -310,17 +309,4 @@ func TestConfigService_SetConfig_PartialPatch(t *testing.T) {
 	if getResp.Embedder.BaseURL == nil || *getResp.Embedder.BaseURL != "https://api.openai.com" {
 		t.Errorf("expected baseURL unchanged, got %v", getResp.Embedder.BaseURL)
 	}
-}
-
-// Stub implementation for tests to compile
-type configService struct {
-	manager *config.Manager
-}
-
-func (s *configService) GetConfig(ctx context.Context) (*GetConfigResponse, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *configService) SetConfig(ctx context.Context, req *SetConfigRequest) (*SetConfigResponse, error) {
-	return nil, errors.New("not implemented")
 }

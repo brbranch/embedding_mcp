@@ -28,6 +28,8 @@ func (m *mockEmbedder) GetDimension() int {
 }
 
 func newTestNoteService(emb embedder.Embedder, s store.Store, namespace string) *noteService {
+	// Initialize store if needed
+	s.Initialize(context.Background(), namespace)
 	return &noteService{
 		embedder:  emb,
 		store:     s,
@@ -771,31 +773,4 @@ func TestNoteService_AddNote_WithAllFields(t *testing.T) {
 	if note.CreatedAt != "2025-01-26T12:00:00Z" {
 		t.Errorf("createdAt not saved correctly: %s", note.CreatedAt)
 	}
-}
-
-// Stub implementation for tests to compile
-type noteService struct {
-	embedder  embedder.Embedder
-	store     store.Store
-	namespace string
-}
-
-func (s *noteService) AddNote(ctx context.Context, req *AddNoteRequest) (*AddNoteResponse, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *noteService) Search(ctx context.Context, req *SearchRequest) (*SearchResponse, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *noteService) Get(ctx context.Context, id string) (*GetResponse, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *noteService) Update(ctx context.Context, req *UpdateRequest) error {
-	return errors.New("not implemented")
-}
-
-func (s *noteService) ListRecent(ctx context.Context, req *ListRecentRequest) (*ListRecentResponse, error) {
-	return nil, errors.New("not implemented")
 }

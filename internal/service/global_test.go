@@ -9,6 +9,8 @@ import (
 )
 
 func newTestGlobalService(s store.Store, namespace string) *globalService {
+	// Initialize store if needed
+	s.Initialize(context.Background(), namespace)
 	return &globalService{
 		store:     s,
 		namespace: namespace,
@@ -250,18 +252,4 @@ func TestGlobalService_UpsertGlobal_StandardKeys(t *testing.T) {
 			t.Errorf("UpsertGlobal failed for key %s: %v", key, err)
 		}
 	}
-}
-
-// Stub implementation for tests to compile
-type globalService struct {
-	store     store.Store
-	namespace string
-}
-
-func (s *globalService) UpsertGlobal(ctx context.Context, req *UpsertGlobalRequest) (*UpsertGlobalResponse, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s *globalService) GetGlobal(ctx context.Context, projectID, key string) (*GetGlobalResponse, error) {
-	return nil, errors.New("not implemented")
 }
