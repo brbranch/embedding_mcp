@@ -414,6 +414,32 @@ CORS有効時のレスポンスヘッダー:
 - `Access-Control-Allow-Headers`: Content-Type
 - `Vary: Origin`: キャッシュ安全のため
 
+## テスト
+
+### ユニットテスト
+
+```bash
+go test ./...
+```
+
+### E2Eテスト（統合テスト）
+
+E2Eテストは外部依存なしで実行可能です（MemoryStore + MockEmbedder使用）。
+
+```bash
+# E2Eテストのみ実行
+go test ./e2e/... -tags=e2e -v
+
+# 全テスト（E2E含む）を実行
+go test ./... -tags=e2e
+```
+
+E2Eテストで検証される項目:
+- projectIdの正規化（`~/tmp/demo` → `/Users/xxx/tmp/demo`）
+- add_note（グループ別ノート追加）
+- search（groupIdフィルタ、全検索）
+- upsert_global/get_global（標準キー、エラーケース）
+
 ## 開発状況
 
 現在開発中です。
