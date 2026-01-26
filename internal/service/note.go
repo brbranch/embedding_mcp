@@ -43,6 +43,13 @@ func (s *noteService) AddNote(ctx context.Context, req *AddNoteRequest) (*AddNot
 		return nil, ErrTextRequired
 	}
 
+	// CreatedAtが指定されている場合はISO8601形式を検証
+	if req.CreatedAt != nil {
+		if _, err := time.Parse(time.RFC3339, *req.CreatedAt); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidTimeFormat, err)
+		}
+	}
+
 	// 埋め込み生成
 	embedding, err := s.embedder.Embed(ctx, req.Text)
 	if err != nil {
@@ -95,6 +102,12 @@ func (s *noteService) Search(ctx context.Context, req *SearchRequest) (*SearchRe
 	}
 	if req.Query == "" {
 		return nil, ErrQueryRequired
+	}
+	// groupIdが指定されている場合はバリデーション
+	if req.GroupID != nil {
+		if err := ValidateGroupID(*req.GroupID); err != nil {
+			return nil, err
+		}
 	}
 
 	// 埋め込み生成
@@ -269,6 +282,12 @@ func (s *noteService) ListRecent(ctx context.Context, req *ListRecentRequest) (*
 	// バリデーション
 	if req.ProjectID == "" {
 		return nil, ErrProjectIDRequired
+	}
+	// groupIdが指定されている場合はバリデーション
+	if req.GroupID != nil {
+		if err := ValidateGroupID(*req.GroupID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Limitのデフォルト値

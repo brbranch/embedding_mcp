@@ -42,6 +42,13 @@ func (s *globalService) UpsertGlobal(ctx context.Context, req *UpsertGlobalReque
 		return nil, fmt.Errorf("%w: %v", ErrInvalidGlobalKey, err)
 	}
 
+	// UpdatedAtが指定されている場合はISO8601形式を検証
+	if req.UpdatedAt != nil {
+		if _, err := time.Parse(time.RFC3339, *req.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidTimeFormat, err)
+		}
+	}
+
 	// updatedAtの生成
 	updatedAt := req.UpdatedAt
 	if updatedAt == nil {
@@ -91,6 +98,11 @@ func (s *globalService) GetGlobal(ctx context.Context, projectID, key string) (*
 	// バリデーション
 	if projectID == "" {
 		return nil, ErrProjectIDRequired
+	}
+
+	// keyのプレフィックス検証（空文字は not found として扱う）
+	if key != "" && !strings.HasPrefix(key, "global.") {
+		return nil, ErrInvalidGlobalKey
 	}
 
 	// Storeから取得
