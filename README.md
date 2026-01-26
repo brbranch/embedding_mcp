@@ -129,6 +129,38 @@ projectIdは以下の順序で正規化されます:
 
 例: `openai:text-embedding-3-small:1536`
 
+## VectorStore
+
+### Store Interface
+
+ベクトルストアの抽象インターフェース。以下の操作をサポート:
+
+- **Note操作**: AddNote, Get, Update, Delete
+- **検索**: Search（ベクトル類似度検索）, ListRecent（最新順取得）
+- **GlobalConfig**: UpsertGlobal, GetGlobal
+
+### 検索フィルタ
+
+```go
+SearchOptions{
+    ProjectID: "...",      // 必須
+    GroupID:   nil,        // nilの場合は全group対象
+    TopK:      5,          // 取得件数
+    Tags:      []string{}, // AND検索（大小文字区別）
+    Since:     &time,      // since <= createdAt
+    Until:     &time,      // createdAt < until
+}
+```
+
+### スコア
+
+検索結果のスコアは0-1に正規化（1が最も類似）。
+
+### 実装
+
+- **MemoryStore**: テスト用インメモリ実装
+- **ChromaStore**: Chroma連携（実装予定）
+
 ## 開発状況
 
 現在開発中です。
