@@ -83,7 +83,10 @@ func TestConfigService_SetConfig_Provider(t *testing.T) {
 	}
 
 	// Verify change
-	getResp, _ := svc.GetConfig(context.Background())
+	getResp, err := svc.GetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
 	if getResp.Embedder.Provider != "ollama" {
 		t.Errorf("expected provider ollama, got %s", getResp.Embedder.Provider)
 	}
@@ -118,7 +121,10 @@ func TestConfigService_SetConfig_Model(t *testing.T) {
 	}
 
 	// Verify change
-	getResp, _ := svc.GetConfig(context.Background())
+	getResp, err := svc.GetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
 	if getResp.Embedder.Model != "text-embedding-3-large" {
 		t.Errorf("expected model text-embedding-3-large, got %s", getResp.Embedder.Model)
 	}
@@ -150,7 +156,10 @@ func TestConfigService_SetConfig_DimReset(t *testing.T) {
 	}
 
 	// Verify dim reset
-	getResp, _ := svc.GetConfig(context.Background())
+	getResp, err := svc.GetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
 	if getResp.Embedder.Dim != 0 {
 		t.Errorf("expected dim to be reset to 0, got %d", getResp.Embedder.Dim)
 	}
@@ -216,7 +225,10 @@ func TestConfigService_SetConfig_NilPatch(t *testing.T) {
 	}
 
 	// Verify no change
-	getResp, _ := svc.GetConfig(context.Background())
+	getResp, err := svc.GetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
 	if getResp.Embedder.Provider != "openai" {
 		t.Errorf("expected provider unchanged, got %s", getResp.Embedder.Provider)
 	}
@@ -248,7 +260,10 @@ func TestConfigService_SetConfig_EmptyProvider(t *testing.T) {
 	}
 
 	// Empty provider should be ignored, original value preserved
-	getResp, _ := svc.GetConfig(context.Background())
+	getResp, err := svc.GetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
 	if getResp.Embedder.Provider != "openai" {
 		t.Errorf("expected provider unchanged when empty, got %s", getResp.Embedder.Provider)
 	}
@@ -282,7 +297,10 @@ func TestConfigService_SetConfig_PartialPatch(t *testing.T) {
 	}
 
 	// Verify other fields unchanged
-	getResp, _ := svc.GetConfig(context.Background())
+	getResp, err := svc.GetConfig(context.Background())
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
 	if getResp.Embedder.Provider != "openai" {
 		t.Errorf("expected provider unchanged, got %s", getResp.Embedder.Provider)
 	}
