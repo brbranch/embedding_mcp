@@ -18,8 +18,9 @@ func (h *Handler) handleAddNote(ctx context.Context, params any) (any, error) {
 	}
 
 	return map[string]any{
-		"id":        resp.ID,
-		"namespace": resp.Namespace,
+		"id":                 resp.ID,
+		"namespace":          resp.Namespace,
+		"canonicalProjectId": resp.CanonicalProjectID,
 	}, nil
 }
 

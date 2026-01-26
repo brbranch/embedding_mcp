@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/brbranch/embedding_mcp/internal/config"
 	"github.com/brbranch/embedding_mcp/internal/embedder"
 	"github.com/brbranch/embedding_mcp/internal/model"
 	"github.com/brbranch/embedding_mcp/internal/store"
@@ -43,6 +44,12 @@ func (s *noteService) AddNote(ctx context.Context, req *AddNoteRequest) (*AddNot
 		return nil, ErrTextRequired
 	}
 
+	// ProjectIDを正規化
+	canonicalProjectID, err := config.CanonicalizeProjectID(req.ProjectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to canonicalize projectId: %w", err)
+	}
+
 	// CreatedAtが指定されている場合はISO8601形式を検証
 	if req.CreatedAt != nil {
 		if _, err := time.Parse(time.RFC3339, *req.CreatedAt); err != nil {
@@ -70,10 +77,10 @@ func (s *noteService) AddNote(ctx context.Context, req *AddNoteRequest) (*AddNot
 		createdAt = &nowStr
 	}
 
-	// Noteモデルの作成
+	// Noteモデルの作成（正規化されたprojectIDを使用）
 	note := &model.Note{
 		ID:        id,
-		ProjectID: req.ProjectID,
+		ProjectID: canonicalProjectID,
 		GroupID:   req.GroupID,
 		Title:     req.Title,
 		Text:      req.Text,
@@ -89,8 +96,9 @@ func (s *noteService) AddNote(ctx context.Context, req *AddNoteRequest) (*AddNot
 	}
 
 	return &AddNoteResponse{
-		ID:        id,
-		Namespace: s.namespace,
+		ID:                 id,
+		Namespace:          s.namespace,
+		CanonicalProjectID: canonicalProjectID,
 	}, nil
 }
 
