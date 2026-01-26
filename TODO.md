@@ -132,16 +132,16 @@
 ---
 
 #### 3. 設定管理 (internal/config)
-- [ ] 設定ファイルの読み書き（~/.local-mcp-memory/config.json）
-- [ ] projectId正規化
+- [x] 設定ファイルの読み書き（~/.local-mcp-memory/config.json）
+- [x] projectId正規化
   - "~" をホームに展開
   - 絶対パス化（filepath.Abs）
   - シンボリックリンク解決（filepath.EvalSymlinks）※失敗時はAbsまで
   - レスポンスでは常にcanonicalProjectIdを返す
-- [ ] namespace生成（`{provider}:{model}:{dim}` 形式）
+- [x] namespace生成（`{provider}:{model}:{dim}` 形式）
   - dimは初回埋め込み時にprovider応答から取得し記録
   - provider変更時はnamespace変更（古いデータは残るが別namespace）
-- [ ] 環境変数によるapiKey上書き（OpenAI用）
+- [x] 環境変数によるapiKey上書き（OpenAI用）
 
 **完了条件**: `go test ./internal/config/...` が成功し、projectId正規化が動作すること
 

@@ -1,0 +1,33 @@
+{
+  "phase": 2,
+  "task": 3,
+  "taskName": "設定管理 (internal/config)",
+  "currentStep": 11,
+  "status": "completed",
+  "branch": "feature/phase2-task3",
+  "worktree": null,
+  "designPR": null,
+  "implPR": {
+    "number": 4,
+    "url": "https://github.com/brbranch/embedding_mcp/pull/4",
+    "status": "merged"
+  },
+  "startedAt": "2026-01-26T13:10:00Z",
+  "completedAt": "2026-01-26T14:00:00Z",
+  "skippedSteps": [
+    {"step": 8, "reason": "設定管理のみ、E2Eテスト対象外"}
+  ],
+  "history": [
+    {"step": 1, "action": "worktree作成", "completedAt": "2026-01-26T13:10:00Z"},
+    {"step": 2, "action": "実装計画作成", "completedAt": "2026-01-26T13:15:00Z"},
+    {"step": 3, "action": "設計レビューLGTM", "completedAt": "2026-01-26T13:20:00Z"},
+    {"step": 4, "action": "テストコード作成", "completedAt": "2026-01-26T13:30:00Z"},
+    {"step": 5, "action": "テストレビューLGTM", "completedAt": "2026-01-26T13:35:00Z"},
+    {"step": 6, "action": "本実装完了", "completedAt": "2026-01-26T13:45:00Z"},
+    {"step": 7, "action": "エスカレーション不要", "completedAt": "2026-01-26T13:46:00Z"},
+    {"step": 8, "action": "E2Eスキップ（設定管理のみ）", "completedAt": "2026-01-26T13:47:00Z"},
+    {"step": 9, "action": "README更新", "completedAt": "2026-01-26T13:50:00Z"},
+    {"step": 10, "action": "全体レビューLGTM", "completedAt": "2026-01-26T13:55:00Z"},
+    {"step": 11, "action": "マージ・クリーンアップ完了", "completedAt": "2026-01-26T14:00:00Z"}
+  ]
+}
