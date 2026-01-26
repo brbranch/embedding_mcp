@@ -293,6 +293,36 @@ response := handler.Handle(ctx, requestBytes)
 go test ./internal/jsonrpc/...
 ```
 
+## Transport
+
+### stdio Transport
+
+標準入出力（stdin/stdout）でJSON-RPC 2.0を処理。NDJSON形式（1行1リクエスト/レスポンス）。
+
+**特徴:**
+- 1リクエスト = 1行（改行で区切る）
+- JSON内の改行は `\n` でエスケープ（複数行JSONは不可）
+- 最大バッファサイズ: 1MB
+- contextキャンセルで graceful shutdown
+
+**使用例（テスト用）:**
+
+```go
+handler := jsonrpc.New(noteService, configService, globalService)
+server := stdio.New(handler)
+err := server.Run(ctx)
+```
+
+**テスト実行:**
+
+```bash
+go test ./internal/transport/stdio/...
+```
+
+### HTTP Transport
+
+（実装予定）
+
 ## 開発状況
 
 現在開発中です。
