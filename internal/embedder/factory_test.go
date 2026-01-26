@@ -7,10 +7,6 @@ import (
 	"github.com/brbranch/embedding_mcp/internal/model"
 )
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestNewEmbedder_OpenAI(t *testing.T) {
 	cfg := &model.EmbedderConfig{
 		Provider: "openai",

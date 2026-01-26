@@ -331,6 +331,26 @@ func TestOpenAIEmbedder_Embed_ContextCanceled(t *testing.T) {
 	}
 }
 
+func TestOpenAIEmbedder_Embed_ContextDeadlineExceeded(t *testing.T) {
+	server := newMockOpenAIServer(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		successHandler([]float32{0.1})(w, r)
+	})
+	defer server.Close()
+
+	emb, _ := NewOpenAIEmbedder("test-key",
+		WithBaseURL(server.URL),
+		WithHTTPClient(server.Client()))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	_, err := emb.Embed(ctx, "text")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("expected context.DeadlineExceeded, got %v", err)
+	}
+}
+
 func TestOpenAIEmbedder_GetDimension_BeforeEmbed(t *testing.T) {
 	emb, _ := NewOpenAIEmbedder("test-key")
 	if dim := emb.GetDimension(); dim != 0 {
