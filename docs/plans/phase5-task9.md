@@ -23,7 +23,7 @@ HTTP transport用の設定構造体を追加:
 ```go
 // HTTPConfig はHTTP transport設定
 type HTTPConfig struct {
-    Host        string   `json:"host"`                  // バインドホスト（デフォルト: "127.0.0.1"）
+    Host        string   `json:"host"`                  // バインドホスト（デフォルト: "127.0.0.1"、必ず127.0.0.1を強制）
     Port        int      `json:"port"`                  // ポート（デフォルト: 8765）
     CORSOrigins []string `json:"corsOrigins,omitempty"` // 許可オリジン（空配列=CORS無効）
 }
@@ -33,7 +33,16 @@ type Config struct {
     // 既存フィールド...
     HTTP HTTPConfig `json:"http"`
 }
+
+// デフォルトHTTP設定
+var DefaultHTTPConfig = HTTPConfig{
+    Host:        "127.0.0.1", // セキュリティ: localhost直接アクセスのみを保証
+    Port:        8765,
+    CORSOrigins: nil,         // CORS無効
+}
 ```
+
+**重要**: `Host` のデフォルト値は `127.0.0.1` を強制し、「localhost直接アクセスのみ」の要件を満たす。
 
 ### 2. HTTPサーバー実装 (`internal/transport/http/server.go`)
 
@@ -72,15 +81,17 @@ func (s *Server) Shutdown(ctx context.Context) error
 
 - `CORSOrigins` が空または未設定の場合: CORSヘッダーを付与しない
 - `CORSOrigins` が設定されている場合:
-  - `Access-Control-Allow-Origin`: リクエストのOriginが許可リストに含まれていれば、そのOriginを返す
+  - `Access-Control-Allow-Origin`: リクエストのOriginが許可リストに含まれていれば、そのOriginを返す（厳密一致）
   - `Access-Control-Allow-Methods`: POST, OPTIONS
   - `Access-Control-Allow-Headers`: Content-Type
+  - `Vary: Origin`: キャッシュ安全のため必ず付与
   - OPTIONSリクエスト（preflight）にも対応
 
 ### 5. Graceful Shutdown
 
 - contextキャンセルで `server.Shutdown()` を呼び出し
 - SIGINT/SIGTERM シグナルで安全に停止
+- `http.ErrServerClosed` は正常終了扱い（エラーとして返さない）
 
 ## ファイル構成
 
@@ -108,8 +119,17 @@ internal/transport/http/
    - GET /rpc を送信
    - 405 Method Not Allowedが返ること
 
-4. **Graceful Shutdown**
+4. **不正なContent-Type**
+   - Content-Type: text/plain を送信
+   - 415 Unsupported Media Type が返ること
+
+5. **空ボディ**
+   - 空のリクエストボディを送信
+   - JSON-RPC Parse Error が返ること
+
+6. **Graceful Shutdown**
    - contextをキャンセルしてサーバーが停止すること
+   - http.ErrServerClosed がエラーとして返らないこと
 
 ### cors_test.go
 
@@ -124,6 +144,13 @@ internal/transport/http/
 
 4. **許可されていないオリジン**
    - 許可リストにないオリジンからのリクエストにCORSヘッダーが付与されないこと
+
+5. **複数オリジン許可**
+   - 複数オリジンが設定されている場合、リクエストのOriginに一致するものが返ること
+   - 一致しないオリジンの場合はCORSヘッダーが付与されないこと
+
+6. **Varyヘッダー**
+   - CORS有効時、`Vary: Origin` が付与されること
 
 ## 実装順序
 
