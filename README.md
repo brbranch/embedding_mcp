@@ -106,22 +106,13 @@ export OPENAI_API_KEY="sk-..."
 }
 ```
 
-### Step 3: 動作確認（HTTP モード）
+### Step 3: 動作確認（stdio モード）
 
 ```bash
-# サーバー起動
-./mcp-memory serve --transport http --port 8765
+echo '{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}' | ./mcp-memory serve
 ```
 
-別ターミナルで動作確認：
-
-```bash
-curl -X POST http://localhost:8765/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}'
-```
-
-レスポンスが返ってくれば成功です。
+JSON形式のレスポンスが返ってくれば成功です。
 
 ### Step 4: Claude Codeへの MCP 登録
 
@@ -130,48 +121,100 @@ Claude Code の設定ファイル `~/.claude/settings.json` に追加：
 ```json
 {
   "mcpServers": {
-    "memory": {
+    "mcp-memory": {
       "command": "/path/to/mcp-memory",
-      "args": ["serve"]
+      "args": ["serve"],
+      "env": {
+        "OPENAI_API_KEY": "sk-..."
+      }
     }
   }
 }
 ```
 
-`/path/to/mcp-memory` は実際のパスに置き換えてください（例: `/Users/yourname/embedding_mcp/mcp-memory`）。
+**設定項目の説明:**
+
+| 項目 | 説明 | 例 |
+|------|------|-----|
+| キー名 | MCPサーバーの識別名 | `"mcp-memory"` |
+| `command` | 実行ファイルの絶対パス | `/Users/yourname/embedding_mcp/mcp-memory` |
+| `args` | コマンドライン引数 | `["serve"]` |
+| `env` | 環境変数（オプション） | `{"OPENAI_API_KEY": "sk-..."}` |
 
 ### Step 5: CLAUDE.md に運用ルールを追記（重要）
 
-プロジェクトの `CLAUDE.md` に以下を追記します。これにより、Claude Codeが適切なタイミングでメモリを使うようになります：
+`~/.claude/CLAUDE.md`（グローバル）または プロジェクトの `CLAUDE.md` に以下を追記します。これにより、Claude Codeが適切なタイミングでメモリを使うようになります：
 
 ```markdown
-## Memory MCP 運用ルール
+# mcp-memory 使用ガイド
 
-MCPサーバー「memory」が利用可能。以下のルールに従って使用すること。
+ユーザーの指示・学び・バグ対応などを保存し、セマンティック検索で参照する。
+※ 一時的な雑談・試行錯誤・詳細な要件定義（別ファイル管理）は保存不要
 
-### 検索タイミング
-- セッション開始時、プロジェクトの方針・規約が関係する話題では:
-  → memory.search(projectId=カレントディレクトリ, groupId="global", topK=5)
-- 特定機能の実装中:
-  → memory.search(projectId=カレントディレクトリ, groupId="feature-xxx", topK=5)
+## groupId
 
-### 保存タイミング
-- 重要な決定・仕様が確定したら:
-  → memory.add_note で保存
-- 保存すべき情報の例:
-  - 技術選定の決定と理由
-  - API設計・データモデル
-  - コーディング規約
-  - 用語の定義
-  - ハマった問題と解決策
+| groupId | 用途 |
+|---------|------|
+| `reviews` | レビュー指摘 |
+| `learning` | デグレ・エラーでハマった内容 |
+| `research` | 調査依頼の内容 |
+| `global` | その他 |
 
-### groupId の使い分け
-- "global": 全体方針、規約、用語集
-- "feature-xxx": 機能単位の仕様（例: feature-auth, feature-payment）
-- "task-xxx": タスク単位の作業メモ
+## tags
 
-### tags の付け方
-- ["仕様"], ["決定"], ["規約"], ["用語"], ["注意点"] など
+状態タグ（複数可）:
+- `rule`: 「覚えておいて」「徹底して」と言われた内容
+- `important`: 「必ず」「絶対に」など強調された内容
+- `decision`: 決定事項
+- `want`: 将来作りたい内容
+- `wip`: 検討中
+- `done`: 完了
+- `putoff`: 先送り
+- `issue`: ユーザー/レビュワーからの指摘
+- `term`: プロジェクト固有の用語
+- `duplicate-<N>`: 重複ノート統合時、残す側に付与
+
+関連タグ:
+- CLAUDE.mdに記載のディレクトリ名（例: `cmd/mcp-memory`）
+- CLAUDE.mdに記載の機能名（あれば）
+- 特定コマンド名（例: `copilot`）
+
+## 保存ルール
+
+関連するやりとりを短く要約して保存する。指摘・エラーは原因と解決策をセットで。
+
+**保存する:**
+- 「覚えておいて」「徹底して」と言われた内容
+- コマンドエラー発生時（解決方法とセット）
+- 計画・プランへの指摘（実装詳細の指摘は除く）
+- Web調査の結果
+- プロジェクト固有の重要情報・用語（有名サービス名は除く）
+- 迷ったらとりあえず保存
+
+## 更新ルール
+
+- タグ変更が適切と判断した場合
+- 参照時に同じ指摘が重複 → `important` タグ追加
+- 参照時に類似ノートが3件以上 → 自明なら統合、迷ったら提案
+
+## 削除ルール
+
+- 以前の内容と矛盾する場合 → ユーザーに確認してから削除
+
+## 参照ルール
+
+**セッション開始時:**
+- `global` を直近10件取得
+- `rule` かつ `important` を取得（topK=50）
+
+**適宜検索:**
+- 新しい作業開始時
+- ユーザーからの質問時
+- コマンドエラー発生時
+
+## 注意事項
+
+- `important` タグが30件超えたらユーザーにエスカレーション
 ```
 
 ### Step 6: 使い始める
@@ -186,104 +229,20 @@ AI: memory.add_note で規約を保存
 AI: memory.search で関連メモを検索して回答
 ```
 
-## ユースケース例
+## CLIオプション
 
-### ケース1: プロジェクト規約の記録
+### serve コマンド
 
-```json
-// memory.add_note
-{
-  "projectId": "~/myproject",
-  "groupId": "global",
-  "title": "コーディング規約",
-  "text": "1. 変数名はcamelCase\n2. 関数は単一責任\n3. エラーは早期return",
-  "tags": ["規約", "コーディング"]
-}
-```
+| オプション | 短縮形 | デフォルト | 説明 |
+|------------|--------|------------|------|
+| `--transport` | `-t` | stdio | トランスポート種別: stdio, http |
+| `--host` | - | 127.0.0.1 | HTTPバインドホスト |
+| `--port` | `-p` | 8765 | HTTPバインドポート |
+| `--config` | `-c` | ~/.local-mcp-memory/config.json | 設定ファイルパス |
 
-### ケース2: 機能仕様の保存
+### search コマンド（ワンショット検索）
 
-```json
-// memory.add_note
-{
-  "projectId": "~/myproject",
-  "groupId": "feature-auth",
-  "title": "認証機能の仕様",
-  "text": "JWTを使用。access tokenは1時間、refresh tokenは7日。",
-  "tags": ["仕様", "認証"]
-}
-```
-
-### ケース3: 過去の議論を検索
-
-```json
-// memory.search
-{
-  "projectId": "~/myproject",
-  "query": "データベースの選定理由",
-  "topK": 5
-}
-```
-
-### ケース4: 古いメモの削除
-
-```json
-// memory.delete
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
----
-
-## 概要
-
-Claude Code から JSON-RPC 2.0 で呼び出せるローカル RAG メモリ基盤を提供します。
-
-## 機能
-
-- 会話メモ/仕様/ノートの保存と検索
-- プロジェクト単位・グループ単位でのメモ管理
-- OpenAI による埋め込み生成（Ollama は将来実装予定）
-- MemoryStore（インメモリ）、SQLiteStore（軽量用途）によるベクトル検索（Chroma は将来実装予定）
-
-## ビルド方法
-
-### 前提条件
-
-- Go 1.22 以上
-
-### ビルド
-
-```bash
-# 全パッケージのビルド確認
-go build ./...
-
-# 実行可能バイナリのビルド
-go build ./cmd/mcp-memory
-```
-
-### 起動
-
-```bash
-# stdio transport（デフォルト）
-mcp-memory serve
-# または
-./mcp-memory serve
-
-# 直接実行（ビルドなし）
-go run ./cmd/mcp-memory serve
-
-# HTTP transport
-mcp-memory serve --transport http --host 127.0.0.1 --port 8765
-
-# カスタム設定ファイル
-./mcp-memory serve --config /path/to/config.json
-```
-
-### ワンショット検索コマンド（v0.9.13～）
-
-MCPサーバーを起動せずに、コマンドラインから直接検索を実行できます。SessionStart Hookとの連携に最適です。
+MCPサーバーを起動せずに、コマンドラインから直接検索を実行できます。
 
 ```bash
 # 基本的な使い方
@@ -294,12 +253,7 @@ mcp-memory search -p ~/myproject -g global -k 10 "コーディング規約"
 
 # JSON形式で出力（スクリプト連携用）
 mcp-memory search -p /path/to/project -f json "API設計"
-
-# stdinからクエリを読み取り（セキュリティ向上）
-echo "機密クエリ" | mcp-memory search -p /path/to/project --stdin
 ```
-
-**search オプション:**
 
 | オプション | 短縮形 | デフォルト | 説明 |
 |------------|--------|------------|------|
@@ -311,18 +265,7 @@ echo "機密クエリ" | mcp-memory search -p /path/to/project --stdin
 | `--config` | `-c` | ~/.local-mcp-memory/config.json | 設定ファイルパス |
 | `--stdin` | - | false | stdinからクエリを読み取る |
 
-**出力例（text形式）:**
-```
-[1] コーディング規約 (score: 0.92)
-    変数名はcamelCase、関数は単一責任...
-    tags: 規約, コーディング
-
-[2] API設計方針 (score: 0.85)
-    RESTful APIを採用、エンドポイントは...
-    tags: 仕様, API
-```
-
-**SessionStart Hookでの使用例:**
+## SessionStart Hook連携
 
 `~/.claude/settings.json`:
 ```json
@@ -359,148 +302,47 @@ fi
 exit 0
 ```
 
-### serve CLI オプション
+## 設定ファイル
 
-| オプション | 短縮形 | デフォルト | 説明 |
-|------------|--------|------------|------|
-| `--transport` | `-t` | stdio | Transport type: stdio, http |
-| `--host` | - | 127.0.0.1 | HTTP bind host |
-| `--port` | `-p` | 8765 | HTTP bind port |
-| `--config` | `-c` | ~/.local-mcp-memory/config.json | Config file path |
+デフォルトパス: `~/.local-mcp-memory/config.json`
 
-### ビルド時デフォルト変更
+### 設定項目一覧
 
-```bash
-# HTTP をデフォルトにしてビルド
-go build -ldflags "-X main.defaultTransport=http" -o mcp-memory ./cmd/mcp-memory
+| セクション | 項目 | デフォルト | 説明 |
+|------------|------|------------|------|
+| embedder | provider | openai | 埋め込みプロバイダ (openai) |
+| embedder | model | text-embedding-3-small | 埋め込みモデル名 |
+| embedder | apiKey | null | APIキー（環境変数優先） |
+| embedder | dim | 0 | 埋め込み次元数（0=自動） |
+| store | type | sqlite | ストア種別 (sqlite) |
+| store | path | \<dataDir>/memory.db | SQLiteデータベースパス |
+| transportDefaults | defaultTransport | stdio | デフォルトトランスポート |
+| paths | configPath | ~/.local-mcp-memory/config.json | 設定ファイルパス |
+| paths | dataDir | ~/.local-mcp-memory/data | データディレクトリ |
 
-# このバイナリは --transport 指定なしでHTTPで起動
-./mcp-memory serve
-```
-
-### シグナルハンドリング
-
-- `SIGINT` (Ctrl+C): Graceful shutdown
-- `SIGTERM`: Graceful shutdown
-
-## データモデル
-
-### Note
-
-メモリノートの基本構造:
-
-```go
-type Note struct {
-    ID        string         // UUID
-    ProjectID string         // 正規化済みパス
-    GroupID   string         // 英数字、-、_のみ（"global"は予約値）
-    Title     *string        // nullable
-    Text      string         // 必須
-    Tags      []string       // 空配列可
-    Source    *string        // nullable
-    CreatedAt *string        // ISO8601 UTC（nullならサーバーが設定）
-    Metadata  map[string]any // nullable
-}
-```
-
-### GlobalConfig
-
-プロジェクト単位のグローバル設定:
-
-```go
-type GlobalConfig struct {
-    ID        string  // UUID
-    ProjectID string  // 正規化済みパス
-    Key       string  // "global."プレフィックス必須
-    Value     any     // 任意のJSON値
-    UpdatedAt *string // ISO8601 UTC
-}
-```
-
-標準キー:
-- `global.memory.embedder.provider`
-- `global.memory.embedder.model`
-- `global.memory.groupDefaults`
-- `global.project.conventions`
-
-## 設定管理
-
-### 設定ファイル
-
-デフォルトの設定ファイルパス: `~/.local-mcp-memory/config.json`
+### 設定例
 
 ```json
 {
-  "transportDefaults": {
-    "defaultTransport": "stdio"
-  },
   "embedder": {
     "provider": "openai",
     "model": "text-embedding-3-small",
-    "dim": 0,
     "apiKey": "sk-..."
   },
   "store": {
     "type": "sqlite",
     "path": "~/.local-mcp-memory/data/memory.db"
-  },
-  "paths": {
-    "configPath": "~/.local-mcp-memory/config.json",
-    "dataDir": "~/.local-mcp-memory/data"
   }
 }
 ```
-
-**Store Type:**
-- `"sqlite"`: 軽量用途（5,000件程度まで推奨、cgo不要）**← 推奨**
-- `"chroma"`: 大規模用途（**未実装**、スタブのみ）
-- 省略時: `"chroma"`（デフォルト設定だが未実装のためMemoryStoreが使用される）
-
-**推奨設定**: 本番環境では `"sqlite"` を使用してください。
-
-**SQLite設定例:**
-```json
-{
-  "store": {
-    "type": "sqlite",
-    "path": "/path/to/custom/memory.db"
-  }
-}
-```
-
-**Chroma設定例（未実装）:**
-```json
-{
-  "store": {
-    "type": "chroma",
-    "url": "http://localhost:8000"
-  }
-}
-```
-
-**注意**: ChromaStoreは現在未実装（スタブのみ）です。この設定を行っても、実際にはMemoryStoreが使用されます。
-
-**注**: `embedder.apiKey` に OpenAI API キーを設定できます。
 
 **セキュリティ注意**: 設定ファイルにAPIキーを保存する場合は、ファイルのパーミッションを適切に設定してください（例: `chmod 600 ~/.local-mcp-memory/config.json`）。可能であれば環境変数での設定を推奨します。
 
 ### 環境変数
 
-OpenAI APIキーは環境変数で設定可能（設定ファイルより優先）:
-
-```bash
-export OPENAI_API_KEY="sk-..."
-```
-
-### projectId正規化
-
-projectIdは以下の順序で正規化されます:
-
-1. `~` をホームディレクトリに展開
-2. 絶対パス化
-3. シンボリックリンク解決（失敗時は絶対パスまで）
-
-例: `~/project` → `/Users/xxx/project`
+| 環境変数 | 説明 |
+|----------|------|
+| `OPENAI_API_KEY` | OpenAI APIキー（設定ファイルより優先） |
 
 ### namespace
 
@@ -508,164 +350,30 @@ projectIdは以下の順序で正規化されます:
 
 例: `openai:text-embedding-3-small:1536`
 
-**重要**: providerやmodelを変更すると、namespaceも変わります。これは異なる埋め込みモデル間での次元数（dim）の不一致を防ぐためです。古いnamespaceのデータはそのまま残りますが、新しいnamespaceからは検索されません。同じデータを新しいモデルで検索したい場合は、再度 `add_note` で追加してください。
+**重要**: providerやmodelを変更すると、namespaceも変わります。異なるnamespaceのデータは検索されません。同じデータを新しいモデルで検索したい場合は、再度 `add_note` で追加してください。
 
-## VectorStore
+## GlobalConfig
 
-### Store Interface
+プロジェクト単位でグローバル設定を保存できます。AIが参照すべきプロジェクト固有の設定に使用します。
 
-ベクトルストアの抽象インターフェース。以下の操作をサポート:
+### 用途
 
-- **Note操作**: AddNote, Get, Update, Delete
-- **検索**: Search（ベクトル類似度検索）, ListRecent（最新順取得）
-- **GlobalConfig**: UpsertGlobal, GetGlobal
+- プロジェクト固有の埋め込み設定
+- グループのデフォルト設定
+- コーディング規約や方針の構造化データ
 
-### 検索フィルタ
+### 標準キー一覧
 
-```go
-SearchOptions{
-    ProjectID: "...",      // 必須
-    GroupID:   nil,        // nilの場合は全group対象
-    TopK:      5,          // 取得件数
-    Tags:      []string{}, // AND検索（大小文字区別）
-    Since:     &time,      // since <= createdAt
-    Until:     &time,      // createdAt < until
-}
-```
+| キー | 説明 |
+|------|------|
+| `global.memory.embedder.provider` | プロジェクト固有の埋め込みプロバイダ |
+| `global.memory.embedder.model` | プロジェクト固有の埋め込みモデル |
+| `global.memory.groupDefaults` | グループデフォルト設定 |
+| `global.project.conventions` | コーディング規約（構造化データ） |
 
-### スコア
+**注意**: キーは必ず `global.` プレフィックスで始める必要があります。
 
-検索結果のスコアは0-1に正規化（1が最も類似）。
-
-### 実装
-
-- **MemoryStore**: テスト・開発用インメモリ実装（実装済み）
-- **SQLiteStore**: 軽量用途向けSQLite実装（実装済み、5,000件程度まで推奨、cgo不要）
-- **ChromaStore**: Chroma連携（**未実装**、スタブのみ存在）
-
-### Chromaのセットアップ（未実装）
-
-**重要**: ChromaStore連携は現在未実装です（スタブのみ）。実装完了後は以下の方法で使用できます:
-
-**サーバーモード:**
-
-```bash
-# Docker で起動
-docker run -d -p 8000:8000 chromadb/chroma
-
-# または pip でインストールして起動
-pip install chromadb
-chroma run --host localhost --port 8000
-```
-
-サーバー起動後、MCP Memory Serverは自動的に `localhost:8000` に接続します。
-
-**現在の状態:**
-
-デフォルトではChromaを指定していますが、Chroma未実装のためMemoryStoreが使用されます。本番環境では設定ファイルで `"store": {"type": "sqlite"}` を指定してSQLiteStoreを使用してください。MemoryStoreはサーバー再起動時にデータが失われます。
-
-**注**: Embedded mode（インプロセスでのChroma実行）は現在未対応です。
-
-## Embedder
-
-### Embedder Interface
-
-テキストから埋め込みベクトルを生成する抽象インターフェース:
-
-```go
-type Embedder interface {
-    Embed(ctx context.Context, text string) ([]float32, error)
-    GetDimension() int  // 未確定時は0
-}
-```
-
-### DimUpdater
-
-初回埋め込み時に次元数を通知するコールバック:
-
-```go
-type DimUpdater interface {
-    UpdateDim(dim int) error
-}
-```
-
-### 実装
-
-- **OpenAIEmbedder**: OpenAI Embeddings API (`text-embedding-3-small`等)
-- **OllamaEmbedder**: Ollama連携（実装予定）
-- **LocalEmbedder**: ローカルモデル（実装予定）
-
-### Factory
-
-```go
-emb, err := embedder.NewEmbedder(cfg, apiKey, dimUpdater)
-```
-
-APIキー解決優先順位:
-1. `cfg.APIKey` (設定ファイル)
-2. `apiKey` パラメータ (環境変数)
-
-### エラー
-
-| エラー | 説明 |
-|--------|------|
-| `ErrAPIKeyRequired` | APIキー未設定 |
-| `ErrNotImplemented` | 未実装プロバイダ |
-| `ErrAPIRequestFailed` | APIリクエスト失敗 |
-| `ErrInvalidResponse` | 不正なAPIレスポンス |
-| `ErrEmptyEmbedding` | 空の埋め込み |
-| `ErrUnknownProvider` | 未知のプロバイダ |
-
-## Service Layer
-
-### NoteService
-
-ノートのCRUD操作と検索を提供:
-
-| メソッド | 説明 |
-|----------|------|
-| `AddNote` | ノート追加（埋め込み生成→Store保存） |
-| `Search` | ベクトル検索（クエリ埋め込み→cosine検索） |
-| `Get` | ID指定でノート取得 |
-| `Update` | ノート更新（text変更時のみ再埋め込み） |
-| `ListRecent` | 最新ノート取得（createdAt降順） |
-
-### ConfigService
-
-設定の取得・変更を提供:
-
-| メソッド | 説明 |
-|----------|------|
-| `GetConfig` | 現在の設定を取得 |
-| `SetConfig` | Embedder設定を変更（provider/model変更時はdimリセット） |
-
-### GlobalService
-
-プロジェクト単位のグローバル設定を提供:
-
-| メソッド | 説明 |
-|----------|------|
-| `UpsertGlobal` | グローバル設定のupsert（`global.`プレフィックス必須） |
-| `GetGlobal` | グローバル設定の取得 |
-
-### テスト実行
-
-```bash
-go test ./internal/service/...
-```
-
-## JSON-RPC Handler
-
-### Handler
-
-JSON-RPC 2.0リクエストをパースし、適切なサービスメソッドにディスパッチ:
-
-```go
-handler := jsonrpc.New(noteService, configService, globalService)
-response := handler.Handle(ctx, requestBytes)
-```
-
-### 対応メソッド
+## 対応メソッド一覧
 
 | メソッド | 説明 |
 |----------|------|
@@ -680,170 +388,44 @@ response := handler.Handle(ctx, requestBytes)
 | `memory.upsert_global` | グローバル設定upsert |
 | `memory.get_global` | グローバル設定取得 |
 
-### エラーコード
+## エラーコードとトラブルシューティング
 
-| コード | 名前 | 説明 |
-|--------|------|------|
-| -32700 | Parse Error | 不正なJSON |
-| -32600 | Invalid Request | 不正なリクエスト（jsonrpc != "2.0"等） |
-| -32601 | Method Not Found | 未知のメソッド |
-| -32602 | Invalid Params | 不正なパラメータ |
-| -32603 | Internal Error | 内部エラー |
-| -32001 | API Key Missing | APIキー未設定 |
-| -32002 | Invalid Key Prefix | global.プレフィックスなし |
-| -32003 | Not Found | リソース未検出 |
+| コード | 名前 | 原因 | 対処法 |
+|--------|------|------|--------|
+| -32700 | Parse Error | 不正なJSON | JSONの構文を確認 |
+| -32600 | Invalid Request | 不正なリクエスト | `jsonrpc: "2.0"` を確認 |
+| -32601 | Method Not Found | 未知のメソッド | メソッド名を確認（例: `memory.add_note`） |
+| -32602 | Invalid Params | 不正なパラメータ | 必須パラメータを確認 |
+| -32603 | Internal Error | 内部エラー | ログを確認 |
+| -32001 | API Key Missing | APIキー未設定 | `OPENAI_API_KEY` 環境変数または設定ファイルを確認 |
+| -32002 | Invalid Key Prefix | `global.`プレフィックスなし | GlobalConfigのキーは `global.` で始める |
+| -32003 | Not Found | リソース未検出 | IDが正しいか確認 |
+| -32004 | Provider Error | APIリクエスト失敗 | APIキーの有効性、ネットワーク接続を確認 |
 
-### テスト実行
+### よくあるトラブル
 
-```bash
-go test ./internal/jsonrpc/...
-```
+**Q: `memory.search` で結果が返ってこない**
 
-## Transport
+- `projectId` が正しいパスか確認（`~` は展開されます）
+- ノートが追加されているか `memory.list_recent` で確認
+- 埋め込みモデルを変更した場合、古いノートは検索されません
 
-### stdio Transport
+**Q: サーバーが起動しない**
 
-標準入出力（stdin/stdout）でJSON-RPC 2.0を処理。NDJSON形式（1行1リクエスト/レスポンス）。
+- 設定ファイルのJSONが正しいか確認
+- APIキーが設定されているか確認
 
-**特徴:**
-- 1リクエスト = 1行（改行で区切る）
-- JSON内の改行は `\n` でエスケープ（複数行JSONは不可）
-- 最大バッファサイズ: 1MB
-- contextキャンセルで graceful shutdown
+**Q: Claude Code がメモリツールを使わない**
 
-**使用例（テスト用）:**
-
-```go
-handler := jsonrpc.New(noteService, configService, globalService)
-server := stdio.New(handler)
-err := server.Run(ctx)
-```
-
-**コマンドライン例:**
-
-```bash
-# パイプでリクエスト送信
-echo '{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}' | ./mcp-memory serve
-
-# 複数リクエスト（1行1リクエスト）
-cat <<'EOF' | ./mcp-memory serve
-{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}
-{"jsonrpc":"2.0","id":2,"method":"memory.add_note","params":{"projectId":"~/test","text":"Hello"}}
-EOF
-```
-
-**改行を含むテキストの例:**
-
-```bash
-# text内の改行は \n でエスケープ（JSONの仕様通り）
-echo '{"jsonrpc":"2.0","id":1,"method":"memory.add_note","params":{"projectId":"~/test","text":"Line1\nLine2\nLine3"}}' | ./mcp-memory serve
-```
-
-**テスト実行:**
-
-```bash
-go test ./internal/transport/stdio/...
-```
-
-### HTTP Transport
-
-HTTP経由でJSON-RPC 2.0を処理。`POST /rpc` エンドポイントを提供。
-
-**特徴:**
-- エンドポイント: `POST /rpc`
-- Content-Type: `application/json`
-- CORS設定可能（デフォルトは無効）
-- contextキャンセルで graceful shutdown
-
-**設定:**
-
-```go
-type Config struct {
-    Addr        string   // listen address (例: "127.0.0.1:8765")
-    CORSOrigins []string // 許可するオリジンリスト、空ならCORS無効
-}
-```
-
-**使用例:**
-
-```go
-handler := jsonrpc.New(noteService, configService, globalService)
-server := http.New(handler, http.Config{
-    Addr: "127.0.0.1:8765",
-})
-err := server.Run(ctx)
-```
-
-**テスト実行:**
-
-```bash
-go test ./internal/transport/http/...
-```
-
-**動作確認:**
-
-```bash
-# HTTPサーバー起動
-./mcp-memory serve --transport http --port 8765
-
-# 別ターミナルでJSON-RPC呼び出し
-curl -X POST http://localhost:8765/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"memory.get_config","params":{}}'
-
-# レスポンス例
-# {"jsonrpc":"2.0","id":1,"result":{"transportDefaults":{"defaultTransport":"stdio"},...}}
-```
-
-**CORS設定例:**
-
-```go
-server := http.New(handler, http.Config{
-    Addr:        "127.0.0.1:8765",
-    CORSOrigins: []string{"http://localhost:3000", "http://example.com"},
-})
-```
-
-CORS有効時のレスポンスヘッダー:
-- `Access-Control-Allow-Origin`: リクエストのOrigin（許可リストに含まれる場合）
-- `Access-Control-Allow-Methods`: POST, OPTIONS
-- `Access-Control-Allow-Headers`: Content-Type
-- `Vary: Origin`: キャッシュ安全のため
-
-## テスト
-
-### ユニットテスト
-
-```bash
-go test ./...
-```
-
-### E2Eテスト（統合テスト）
-
-E2Eテストは外部依存なしで実行可能です（MemoryStore + MockEmbedder使用）。
-
-```bash
-# E2Eテストのみ実行
-go test ./e2e/... -tags=e2e -v
-
-# 全テスト（E2E含む）を実行
-go test ./... -tags=e2e
-```
-
-E2Eテストで検証される項目:
-- projectIdの正規化（`~/tmp/demo` → `/Users/xxx/tmp/demo`）
-- add_note（グループ別ノート追加）
-- search（groupIdフィルタ、全検索）
-- upsert_global/get_global（標準キー、エラーケース）
+- CLAUDE.md に運用ルールを追記してください（Step 5参照）
 
 ## Pythonクライアント
 
-`clients/python` に Python クライアントライブラリが含まれています。LangGraph/LangChain との統合も可能です。
+`clients/python` に Python クライアントライブラリが含まれています。
 
 ### インストール
 
 ```bash
-# ソースからインストール
 cd clients/python
 pip install -e .
 
@@ -876,82 +458,32 @@ with MCPMemoryClient() as client:
         print(f"- {note.text[:50]}... (score: {note.score})")
 ```
 
-### LangGraph統合
-
-```python
-from mcp_memory_client.langchain_tools import configure_memory_client, MEMORY_TOOLS
-from langgraph.prebuilt import create_react_agent
-from langchain_openai import ChatOpenAI
-
-# メモリクライアント設定
-configure_memory_client(base_url="http://localhost:8765")
-
-# エージェント作成
-llm = ChatOpenAI(model="gpt-4")
-agent = create_react_agent(llm, tools=MEMORY_TOOLS)
-```
-
 詳細は `clients/python/README.md` を参照してください。
 
-### SQLiteStoreの使用
+## テスト
 
-SQLiteStoreは軽量用途（5,000件程度まで）向けの組み込みベクトルストアです。cgo不要（`modernc.org/sqlite`使用）で、追加の外部依存なしに使用できます。
+```bash
+# ユニットテスト
+go test ./...
 
-**特徴:**
-- 全件スキャンによるcosine類似度検索
-- embeddingsをBLOB形式で保存
-- 5,000件超過時に警告ログ出力
-- namespace分離対応
-
-**MCPサーバーでの使用:**
-
-設定ファイル（`~/.local-mcp-memory/config.json`）で以下のように設定します:
-
-```json
-{
-  "store": {
-    "type": "sqlite",
-    "path": "~/.local-mcp-memory/data/memory.db"
-  }
-}
+# E2Eテスト（統合テスト）
+go test ./e2e/... -tags=e2e -v
 ```
-
-`path`を省略すると、デフォルトで`<dataDir>/memory.db`が使用されます。
-
-**プログラムから直接使用する場合:**
-
-```go
-import "github.com/brbranch/embedding_mcp/internal/store"
-
-// SQLiteStoreを作成
-sqliteStore, err := store.NewSQLiteStore("/path/to/data.db")
-if err != nil {
-    log.Fatal(err)
-}
-defer sqliteStore.Close()
-
-// 初期化（namespaceを設定）
-ctx := context.Background()
-err = sqliteStore.Initialize(ctx, "openai:text-embedding-3-small:1536")
-```
-
-**注意:**
-- 大規模データ（5,000件超）の場合はChromaStoreを推奨（将来実装予定）
-- 全件スキャン方式のため、件数が増えると検索が遅くなります
 
 ## 開発状況
 
 ### 実装済み
-- ✅ **MemoryStore**: インメモリ実装（テスト・開発用）
-- ✅ **SQLiteStore**: 軽量用途向けSQLite実装（5,000件程度まで推奨）
-- ✅ **OpenAI Embedder**: OpenAI Embeddings API連携
+
+- **SQLiteStore**: 軽量用途向けSQLite実装（5,000件程度まで推奨、cgo不要）
+- **MemoryStore**: インメモリ実装（テスト・開発用）
+- **OpenAI Embedder**: OpenAI Embeddings API連携
 
 ### 未実装（将来実装予定）
-- ⏳ **ChromaStore**: 大規模用途向けChroma連携（現在はスタブのみ、実装すれば数万件以上のデータ対応可能）
-- ⏳ **Ollama Embedder**: ローカルLLMによる埋め込み生成（スタブあり）
-- ⏳ **Local Embedder**: ローカルモデル対応（スタブあり）
+
+- **ChromaStore**: 大規模用途向けChroma連携
+- **Ollama Embedder**: ローカルLLMによる埋め込み生成
+- **Local Embedder**: ローカルモデル対応
 
 **現在の推奨構成**:
 - 小規模〜中規模（〜5,000件）: **SQLiteStore** + OpenAI Embedder
 - 開発・テスト: **MemoryStore** + OpenAI Embedder
-- 大規模（5,000件超）: ChromaStore実装待ち、または他のベクトルDBを検討
