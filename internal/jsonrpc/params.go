@@ -215,3 +215,8 @@ type GetGlobalParams struct {
 	ProjectID string `json:"projectId"`
 	Key       string `json:"key"`
 }
+
+// DeleteParams は memory.delete のパラメータ
+type DeleteParams struct {
+	ID string `json:"id"`
+}

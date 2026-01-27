@@ -16,6 +16,7 @@ type mockNoteService struct {
 	searchFunc     func(ctx context.Context, req *service.SearchRequest) (*service.SearchResponse, error)
 	getFunc        func(ctx context.Context, id string) (*service.GetResponse, error)
 	updateFunc     func(ctx context.Context, req *service.UpdateRequest) error
+	deleteFunc     func(ctx context.Context, id string) error
 	listRecentFunc func(ctx context.Context, req *service.ListRecentRequest) (*service.ListRecentResponse, error)
 }
 
@@ -43,6 +44,13 @@ func (m *mockNoteService) Get(ctx context.Context, id string) (*service.GetRespo
 func (m *mockNoteService) Update(ctx context.Context, req *service.UpdateRequest) error {
 	if m.updateFunc != nil {
 		return m.updateFunc(ctx, req)
+	}
+	return nil
+}
+
+func (m *mockNoteService) Delete(ctx context.Context, id string) error {
+	if m.deleteFunc != nil {
+		return m.deleteFunc(ctx, id)
 	}
 	return nil
 }
@@ -81,6 +89,7 @@ func (m *mockConfigService) SetConfig(ctx context.Context, req *service.SetConfi
 type mockGlobalService struct {
 	upsertGlobalFunc func(ctx context.Context, req *service.UpsertGlobalRequest) (*service.UpsertGlobalResponse, error)
 	getGlobalFunc    func(ctx context.Context, projectID, key string) (*service.GetGlobalResponse, error)
+	deleteByIDFunc   func(ctx context.Context, id string) error
 }
 
 func (m *mockGlobalService) UpsertGlobal(ctx context.Context, req *service.UpsertGlobalRequest) (*service.UpsertGlobalResponse, error) {
@@ -95,6 +104,13 @@ func (m *mockGlobalService) GetGlobal(ctx context.Context, projectID, key string
 		return m.getGlobalFunc(ctx, projectID, key)
 	}
 	return &service.GetGlobalResponse{Namespace: "test-ns", Found: false}, nil
+}
+
+func (m *mockGlobalService) DeleteByID(ctx context.Context, id string) error {
+	if m.deleteByIDFunc != nil {
+		return m.deleteByIDFunc(ctx, id)
+	}
+	return nil
 }
 
 // === ヘルパー関数 ===

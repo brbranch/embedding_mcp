@@ -3,6 +3,8 @@ package jsonrpc
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/brbranch/embedding_mcp/internal/service"
 )
 
 // handleAddNote は memory.add_note を処理
@@ -233,6 +235,39 @@ func (h *Handler) handleGetGlobal(ctx context.Context, params any) (any, error) 
 	}
 
 	return result, nil
+}
+
+// handleDelete は memory.delete を処理
+func (h *Handler) handleDelete(ctx context.Context, params any) (any, error) {
+	var p DeleteParams
+	if err := mapParams(params, &p); err != nil {
+		return nil, err
+	}
+
+	// ID必須チェック
+	if p.ID == "" {
+		return nil, errIDRequired
+	}
+
+	// まずNoteを削除してみる
+	err := h.noteService.Delete(ctx, p.ID)
+	if err == nil {
+		return map[string]any{"ok": true}, nil
+	}
+
+	// NoteNotFoundの場合はGlobalConfigを試す
+	if err == service.ErrNoteNotFound {
+		err = h.globalService.DeleteByID(ctx, p.ID)
+		if err == nil {
+			return map[string]any{"ok": true}, nil
+		}
+		// GlobalConfigNotFoundの場合は「Not found」を返す
+		if err == service.ErrGlobalConfigNotFound {
+			return nil, errNotFound
+		}
+	}
+
+	return nil, err
 }
 
 // mapParams はanyをターゲット構造体にマッピング

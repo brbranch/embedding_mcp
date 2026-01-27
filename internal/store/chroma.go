@@ -82,3 +82,13 @@ func (s *ChromaStore) UpsertGlobal(ctx context.Context, config *model.GlobalConf
 func (s *ChromaStore) GetGlobal(ctx context.Context, projectID, key string) (*model.GlobalConfig, bool, error) {
 	return nil, false, fmt.Errorf("ChromaStore is not yet implemented")
 }
+
+// GetGlobalByID はIDでグローバル設定を取得する
+func (s *ChromaStore) GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error) {
+	return nil, fmt.Errorf("ChromaStore is not yet implemented")
+}
+
+// DeleteGlobalByID はIDでグローバル設定を削除する
+func (s *ChromaStore) DeleteGlobalByID(ctx context.Context, id string) error {
+	return fmt.Errorf("ChromaStore is not yet implemented")
+}

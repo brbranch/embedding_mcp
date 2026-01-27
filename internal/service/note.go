@@ -285,6 +285,24 @@ func (s *noteService) Update(ctx context.Context, req *UpdateRequest) error {
 	return nil
 }
 
+// Delete はノートを削除する
+func (s *noteService) Delete(ctx context.Context, id string) error {
+	// バリデーション
+	if id == "" {
+		return ErrIDRequired
+	}
+
+	// Storeから削除
+	if err := s.store.Delete(ctx, id); err != nil {
+		if err == store.ErrNotFound {
+			return ErrNoteNotFound
+		}
+		return fmt.Errorf("failed to delete note: %w", err)
+	}
+
+	return nil
+}
+
 // ListRecent は最近のノートを取得する
 func (s *noteService) ListRecent(ctx context.Context, req *ListRecentRequest) (*ListRecentResponse, error) {
 	// バリデーション

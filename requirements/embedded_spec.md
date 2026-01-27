@@ -285,6 +285,17 @@ Output:
   "updatedAt": string|null
 }
 
+10) memory.delete
+Input:
+{ "id": string }
+Output:
+{ "ok": true }
+
+- 物理削除を実行
+- 検索順序: Note → GlobalConfig（Noteを優先）
+- Note/GlobalConfig共にUUID v4形式（衝突なし）
+- 指定IDが存在しない場合は Not found エラー (-32001)
+
 # 9. 設定ファイル & データ保存
 - 設定ファイルはローカルに保存する（例: ~/.local-mcp-memory/config.json）。
 - データディレクトリもローカル（例: ~/.local-mcp-memory/data/）。

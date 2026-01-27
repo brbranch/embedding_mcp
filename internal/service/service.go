@@ -12,6 +12,7 @@ type NoteService interface {
 	Search(ctx context.Context, req *SearchRequest) (*SearchResponse, error)
 	Get(ctx context.Context, id string) (*GetResponse, error)
 	Update(ctx context.Context, req *UpdateRequest) error
+	Delete(ctx context.Context, id string) error
 	ListRecent(ctx context.Context, req *ListRecentRequest) (*ListRecentResponse, error)
 }
 
@@ -21,16 +22,18 @@ type ConfigService interface {
 	SetConfig(ctx context.Context, req *SetConfigRequest) (*SetConfigResponse, error)
 }
 
-// GlobalService はグローバル設定のUpsert/Getを提供
+// GlobalService はグローバル設定のUpsert/Get/Deleteを提供
 type GlobalService interface {
 	UpsertGlobal(ctx context.Context, req *UpsertGlobalRequest) (*UpsertGlobalResponse, error)
 	GetGlobal(ctx context.Context, projectID, key string) (*GetGlobalResponse, error)
+	DeleteByID(ctx context.Context, id string) error
 }
 
 // エラー定義
 var (
-	ErrNoteNotFound      = errors.New("note not found")
-	ErrInvalidGlobalKey  = errors.New("key must start with 'global.'")
+	ErrNoteNotFound         = errors.New("note not found")
+	ErrGlobalConfigNotFound = errors.New("global config not found")
+	ErrInvalidGlobalKey     = errors.New("key must start with 'global.'")
 	ErrProjectIDRequired = errors.New("projectId is required")
 	ErrGroupIDRequired   = errors.New("groupId is required")
 	ErrInvalidGroupID    = errors.New("groupId contains invalid characters")
