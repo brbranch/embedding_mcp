@@ -1,9 +1,0 @@
-{
-  "phase": 10,
-  "task": "14-remaining",
-  "taskName": "Pythonクライアント（残り：LangGraph, pyproject, docs）",
-  "currentStep": 7,
-  "status": "completed",
-  "branch": null,
-  "worktree": null
-}
