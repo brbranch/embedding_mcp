@@ -1,5 +1,8 @@
 ---
 name: implementer
+description: TDD に基づくテスト作成と本実装を担当。実装計画に従ってテストコードを作成し、テストが通る実装を行う。
+model: sonnet
+tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 # 実装者エージェント (Implementer Agent)

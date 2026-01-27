@@ -1,5 +1,8 @@
 ---
 name: finisher
+description: E2E テストの実施と README 更新を担当。TODO.md の完了条件に基づいて動作確認を行い、ドキュメントを整備する。
+model: sonnet
+tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 # 仕上げ担当エージェント (Finisher Agent)

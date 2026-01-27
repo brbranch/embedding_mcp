@@ -1,5 +1,8 @@
 ---
 name: designer
+description: 実装計画の作成を担当するアーキテクト。TODO.md や requirements/ から要件を確認し、docs/plans/ に L3 詳細度の実装計画を作成する。
+model: opus
+tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
 # 設計者エージェント (Designer Agent)
