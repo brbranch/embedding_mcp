@@ -374,20 +374,20 @@
 ---
 
 #### 16. memory.delete メソッド実装
-- 🚧 仕様検討
+- [x] 仕様検討
   - `requirements/embedded_spec.md` に delete メソッドの仕様を追加
   - 入出力形式、エラーケースの定義
-  - 論理削除 vs 物理削除の検討
-- [ ] 影響範囲調査
-  - Store interface への Delete メソッド追加
+  - 物理削除を採用
+- [x] 影響範囲調査
+  - Store interface への GetGlobalByID, DeleteGlobalByID メソッド追加
   - JSON-RPC ハンドラー追加
-  - Skill 定義への反映
-- [ ] 実装
+  - Note優先検索（Note → GlobalConfigの順）
+- [x] 実装
   - JSON-RPCメソッド `memory.delete` の追加
   - ノートおよびグローバル設定をIDで削除
   - 古いノートの整理、テストデータのクリーンアップ用途
 
-**完了条件**: `go test ./...` で delete メソッドのテストが成功すること
+**完了条件**: `go test ./...` で delete メソッドのテストが成功すること ✅
 
 ---
 
