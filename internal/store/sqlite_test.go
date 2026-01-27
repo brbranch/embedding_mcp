@@ -943,3 +943,83 @@ func TestSQLiteStore_Close(t *testing.T) {
 		t.Error("Expected error after close")
 	}
 }
+
+// TestSQLiteStore_ListRecent_ProjectIDFilter はprojectIDフィルタをテスト
+func TestSQLiteStore_ListRecent_ProjectIDFilter(t *testing.T) {
+	store := setupInitializedSQLiteStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummySQLiteEmbedding(1536)
+
+	note1 := newSQLiteTestNote("lp-1", testSQLiteProjectID, testSQLiteGroupID, "Project 1")
+	note2 := newSQLiteTestNote("lp-2", "/other/project", testSQLiteGroupID, "Project 2")
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+
+	opts := ListOptions{
+		ProjectID: testSQLiteProjectID,
+		Limit:     10,
+	}
+
+	notes, err := store.ListRecent(ctx, opts)
+	if err != nil {
+		t.Fatalf("ListRecent failed: %v", err)
+	}
+
+	if len(notes) != 1 {
+		t.Errorf("Expected 1 note, got %d", len(notes))
+	}
+	if len(notes) > 0 && notes[0].ID != "lp-1" {
+		t.Errorf("Expected note 'lp-1', got '%s'", notes[0].ID)
+	}
+}
+
+// TestSQLiteStore_Update_WithReembedding はembedding変更を伴う更新をテスト
+func TestSQLiteStore_Update_WithReembedding(t *testing.T) {
+	store := setupInitializedSQLiteStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding1 := dummySQLiteEmbedding(1536)
+
+	note := newSQLiteTestNote("reembed-test", testSQLiteProjectID, testSQLiteGroupID, "Original text")
+	store.AddNote(ctx, note, embedding1)
+
+	// 新しいembeddingで更新
+	embedding2 := make([]float32, 1536)
+	for i := range embedding2 {
+		embedding2[i] = 1.0 - embedding1[i]
+	}
+	note.Text = "Updated text"
+	if err := store.Update(ctx, note, embedding2); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	// 更新されたテキストを確認
+	retrieved, _ := store.Get(ctx, "reembed-test")
+	if retrieved.Text != "Updated text" {
+		t.Errorf("Expected text 'Updated text', got '%s'", retrieved.Text)
+	}
+
+	// 新しいembeddingで検索するとスコアが高くなることを確認
+	opts := SearchOptions{
+		ProjectID: testSQLiteProjectID,
+		TopK:      5,
+	}
+
+	results, err := store.Search(ctx, embedding2, opts)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+
+	// embedding2で検索してスコアが高い（1.0に近い）ことを確認
+	if results[0].Score < 0.99 {
+		t.Errorf("Expected score close to 1.0 after re-embedding, got %f", results[0].Score)
+	}
+}

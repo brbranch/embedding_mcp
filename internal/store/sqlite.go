@@ -322,13 +322,17 @@ func (s *SQLiteStore) Search(ctx context.Context, embedding []float32, opts Sear
 			note.CreatedAt = &createdAt.String
 		}
 		if tagsJSON.Valid {
-			json.Unmarshal([]byte(tagsJSON.String), &note.Tags)
+			if err := json.Unmarshal([]byte(tagsJSON.String), &note.Tags); err != nil {
+				slog.Warn("failed to unmarshal tags in Search", "noteID", id, "error", err)
+			}
 		}
 		if note.Tags == nil {
 			note.Tags = []string{}
 		}
 		if metadataJSON.Valid && metadataJSON.String != "" {
-			json.Unmarshal([]byte(metadataJSON.String), &note.Metadata)
+			if err := json.Unmarshal([]byte(metadataJSON.String), &note.Metadata); err != nil {
+				slog.Warn("failed to unmarshal metadata in Search", "noteID", id, "error", err)
+			}
 		}
 
 		// groupIDフィルタ
@@ -443,13 +447,17 @@ func (s *SQLiteStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 			note.CreatedAt = &createdAt.String
 		}
 		if tagsJSON.Valid {
-			json.Unmarshal([]byte(tagsJSON.String), &note.Tags)
+			if err := json.Unmarshal([]byte(tagsJSON.String), &note.Tags); err != nil {
+				slog.Warn("failed to unmarshal tags in ListRecent", "noteID", id, "error", err)
+			}
 		}
 		if note.Tags == nil {
 			note.Tags = []string{}
 		}
 		if metadataJSON.Valid && metadataJSON.String != "" {
-			json.Unmarshal([]byte(metadataJSON.String), &note.Metadata)
+			if err := json.Unmarshal([]byte(metadataJSON.String), &note.Metadata); err != nil {
+				slog.Warn("failed to unmarshal metadata in ListRecent", "noteID", id, "error", err)
+			}
 		}
 
 		// groupIDフィルタ
@@ -602,13 +610,17 @@ func (s *SQLiteStore) scanNote(row *sql.Row) (*model.Note, error) {
 		note.CreatedAt = &createdAt.String
 	}
 	if tagsJSON.Valid {
-		json.Unmarshal([]byte(tagsJSON.String), &note.Tags)
+		if err := json.Unmarshal([]byte(tagsJSON.String), &note.Tags); err != nil {
+			slog.Warn("failed to unmarshal tags in scanNote", "noteID", id, "error", err)
+		}
 	}
 	if note.Tags == nil {
 		note.Tags = []string{}
 	}
 	if metadataJSON.Valid && metadataJSON.String != "" {
-		json.Unmarshal([]byte(metadataJSON.String), &note.Metadata)
+		if err := json.Unmarshal([]byte(metadataJSON.String), &note.Metadata); err != nil {
+			slog.Warn("failed to unmarshal metadata in scanNote", "noteID", id, "error", err)
+		}
 	}
 
 	return note, nil
