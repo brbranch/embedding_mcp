@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/brbranch/embedding_mcp/internal/config"
 	"github.com/brbranch/embedding_mcp/internal/embedder"
@@ -63,6 +64,10 @@ func Initialize(ctx context.Context, configPath string) (*Services, func(), erro
 		dbPath := cfg.Paths.DataDir + "/memory.db"
 		if cfg.Store.Path != nil && *cfg.Store.Path != "" {
 			dbPath = *cfg.Store.Path
+		}
+		// DBファイルの親ディレクトリを作成
+		if err := config.EnsureDir(filepath.Dir(dbPath)); err != nil {
+			return nil, nil, fmt.Errorf("failed to create data directory: %w", err)
 		}
 		st, err = store.NewSQLiteStore(dbPath)
 		if err != nil {

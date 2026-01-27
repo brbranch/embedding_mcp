@@ -33,8 +33,19 @@ func New(
 
 // Handle はJSON-RPCリクエストをパースしてディスパッチ
 // 戻り値は *model.Response または *model.ErrorResponse のJSON bytes
+// 通知（idがnilまたは未設定）の場合はnilを返す
 func (h *Handler) Handle(ctx context.Context, requestBytes []byte) []byte {
-	// 1. パース
+	// 1. パース（ID の存在を確認するため raw で）
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(requestBytes, &raw); err != nil {
+		return h.encodeError(model.NewParseError(err.Error()))
+	}
+
+	// ID の有無と値を確認
+	idRaw, hasID := raw["id"]
+	isNotification := !hasID || (hasID && string(idRaw) == "null")
+
+	// 構造体にパース
 	var req model.Request
 	if err := json.Unmarshal(requestBytes, &req); err != nil {
 		return h.encodeError(model.NewParseError(err.Error()))
@@ -42,27 +53,49 @@ func (h *Handler) Handle(ctx context.Context, requestBytes []byte) []byte {
 
 	// 2. バージョン確認
 	if req.JSONRPC != "2.0" {
+		if isNotification {
+			return nil
+		}
 		return h.encodeError(model.NewInvalidRequest(req.ID, "jsonrpc must be 2.0"))
 	}
 
 	// 3. method確認
 	if req.Method == "" {
+		if isNotification {
+			return nil
+		}
 		return h.encodeError(model.NewInvalidRequest(req.ID, "method is required"))
 	}
 
-	// 4. ディスパッチ
+	// 4. 通知の処理（レスポンスを返さない）
+	if isNotification {
+		// 通知は処理するがレスポンスは返さない
+		// dispatch して結果は捨てる
+		_, _ = h.dispatch(ctx, req.ID, req.Method, req.Params)
+		return nil
+	}
+
+	// 5. ディスパッチ
 	result, err := h.dispatch(ctx, req.ID, req.Method, req.Params)
 	if err != nil {
 		return h.encodeError(h.mapError(req.ID, err))
 	}
 
-	// 5. 成功レスポンス
+	// 6. 成功レスポンス
 	return h.encodeResponse(model.NewResponse(req.ID, result))
 }
 
 // dispatch はメソッドに応じて適切なハンドラーを呼び出す
 func (h *Handler) dispatch(ctx context.Context, id any, method string, params any) (any, error) {
 	switch method {
+	// MCP 標準メソッド
+	case "initialize":
+		return h.handleInitialize(ctx, params)
+	case "tools/list":
+		return h.handleToolsList(ctx, params)
+	case "tools/call":
+		return h.handleToolsCall(ctx, id, params)
+	// memory.* メソッド（後方互換性のため維持）
 	case "memory.add_note":
 		return h.handleAddNote(ctx, params)
 	case "memory.search":

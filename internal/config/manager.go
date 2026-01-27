@@ -174,7 +174,7 @@ func DefaultConfig(configPath, dataDir string) *model.Config {
 			APIKey:   nil,
 		},
 		Store: model.StoreConfig{
-			Type: model.StoreTypeChroma,
+			Type: model.StoreTypeSQLite,
 			Path: nil,
 			URL:  nil,
 		},

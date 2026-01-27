@@ -1,3 +1,7 @@
+---
+name: tech-leader
+---
+
 # テックリーダーエージェント (Tech Leader Agent)
 
 ## 役割

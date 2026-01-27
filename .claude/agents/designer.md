@@ -1,3 +1,7 @@
+---
+name: designer
+---
+
 # 設計者エージェント (Designer Agent)
 
 ## 役割

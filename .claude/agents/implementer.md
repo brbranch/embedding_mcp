@@ -1,3 +1,7 @@
+---
+name: implementer
+---
+
 # 実装者エージェント (Implementer Agent)
 
 ## 役割

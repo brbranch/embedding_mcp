@@ -1,3 +1,7 @@
+---
+name: finisher
+---
+
 # 仕上げ担当エージェント (Finisher Agent)
 
 ## 役割
