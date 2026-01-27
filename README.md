@@ -501,6 +501,7 @@ SearchOptions{
 ### 実装
 
 - **MemoryStore**: テスト用インメモリ実装
+- **SQLiteStore**: 軽量用途向けSQLite実装（5,000件程度まで推奨）
 - **ChromaStore**: Chroma連携（実装予定）
 
 ### Chromaのセットアップ（将来実装予定）
@@ -852,10 +853,40 @@ agent = create_react_agent(llm, tools=MEMORY_TOOLS)
 
 詳細は `clients/python/README.md` を参照してください。
 
+### SQLiteStoreの使用
+
+SQLiteStoreは軽量用途（5,000件程度まで）向けの組み込みベクトルストアです。cgo不要（`modernc.org/sqlite`使用）で、追加の外部依存なしに使用できます。
+
+**特徴:**
+- 全件スキャンによるcosine類似度検索
+- embeddingsをBLOB形式で保存
+- 5,000件超過時に警告ログ出力
+- namespace分離対応
+
+**使用例（プログラムから）:**
+
+```go
+import "github.com/brbranch/embedding_mcp/internal/store"
+
+// SQLiteStoreを作成
+sqliteStore, err := store.NewSQLiteStore("/path/to/data.db")
+if err != nil {
+    log.Fatal(err)
+}
+defer sqliteStore.Close()
+
+// 初期化（namespaceを設定）
+ctx := context.Background()
+err = sqliteStore.Initialize(ctx, "openai:text-embedding-3-small:1536")
+```
+
+**注意:**
+- 大規模データ（5,000件超）の場合はChromaStoreを推奨
+- 全件スキャン方式のため、件数が増えると検索が遅くなります
+
 ## 開発状況
 
 コア機能は実装済みです。以下は将来実装予定:
 
 - **ChromaStore完全実装**: 現在はスタブのみ、本番環境向けChroma連携
 - **Ollama embedder**: ローカルLLMによる埋め込み生成
-- **SQLite VectorStore**: 軽量用途向けの組み込みベクトルストア
