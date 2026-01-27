@@ -40,3 +40,6 @@ dist/
 build/
 .eggs/
 clients/python/.venv/
+
+# Local TODO
+docs/todo/
