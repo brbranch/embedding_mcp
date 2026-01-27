@@ -364,7 +364,7 @@
 ### Phase 11: 追加Store/Embedder実装（optional）
 
 #### 15. SQLite VectorStore実装 (internal/store)
-- [ ] SQLite実装（modernc.org/sqlite使用、cgo不要）
+- 🚧 SQLite実装（modernc.org/sqlite使用、cgo不要）
 - [ ] cosine類似度による全件スキャン検索
 - [ ] embeddings を SQLite に保存（軽量用途向け）
 - [ ] 5,000件超過時の警告ログ出力
