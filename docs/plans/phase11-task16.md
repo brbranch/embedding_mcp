@@ -23,8 +23,9 @@ Output:
 | 項目 | 決定 | 理由 |
 |------|------|------|
 | 削除方式 | 物理削除 | 用途が「古いノートの整理、テストデータのクリーンアップ」と明確 |
-| 対象 | Note または GlobalConfig | ID検索時、Noteを優先、なければGlobalConfigを検索 |
+| 対象 | Note または GlobalConfig | ID検索時、Noteを優先、なければGlobalConfigをID検索 |
 | 復元対応 | 非対応 | 論理削除が必要な場合は `tags: ["archived"]` でマーキング運用を推奨 |
+| ID形式 | UUID v4 | Note/GlobalConfig共通（`github.com/google/uuid` で生成、衝突確率は事実上ゼロ） |
 
 ### エラーケース
 
@@ -40,31 +41,34 @@ Output:
 
 ```go
 // 追加
-DeleteGlobal(ctx context.Context, projectID, key string) error
+GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error)
+DeleteGlobalByID(ctx context.Context, id string) error
 ```
 
 - `Delete(ctx, id)` は Note 用（既存）
-- `DeleteGlobal(ctx, projectID, key)` は GlobalConfig 用（新規）
+- `GetGlobalByID(ctx, id)` は GlobalConfig のID検索用（新規）
+- `DeleteGlobalByID(ctx, id)` は GlobalConfig のID削除用（新規）
 
 ### 2. Store 実装
 
 | 実装 | ファイル | 対応内容 |
 |------|----------|----------|
-| SQLite | `internal/store/sqlite.go` | DELETE FROM notes / DELETE FROM global_config |
-| Memory | `internal/store/memory.go` | map からの削除 |
-| Chroma | `internal/store/chroma.go` | stub（NotImplemented） |
+| SQLite | `internal/store/sqlite.go` | SELECT/DELETE FROM global_config WHERE id = ? |
+| Memory | `internal/store/memory.go` | map からの検索・削除（ID→key逆引き必要） |
+| Chroma | `internal/store/chroma.go` | stub（ErrNotSupported 返却） |
 
 ### 3. Service 層
 
-| サービス | 追加メソッド |
-|----------|------------|
-| NoteService | `Delete(ctx, id) error` |
-| GlobalService | `DeleteGlobal(ctx, projectID, key) error` |
+| サービス | 追加メソッド | 説明 |
+|----------|------------|------|
+| NoteService | `Delete(ctx, id) error` | Note削除 |
+| GlobalService | `DeleteByID(ctx, id) error` | GlobalConfig をIDで削除 |
 
 ### 4. JSON-RPC Handler (`internal/jsonrpc/handler.go`)
 
 - `memory.delete` ハンドラー追加
 - dispatch に case 追加
+- 削除ロジック: NoteService.Get(id) → 存在すれば Delete → 無ければ GlobalService.DeleteByID(id)
 - mapError に ErrGlobalConfigNotFound 追加
 
 ### 5. Python Client (`clients/python/`)
@@ -79,21 +83,27 @@ DeleteGlobal(ctx context.Context, projectID, key string) error
 
 - `memory.delete` の使用方法記載
 
+### 8. README (`README.md`)
+
+- memory.delete の使用例追記
+
 ## 要件トレーサビリティ表
 
 | 要件ID | TODO項目 | テストケース | 実装箇所 |
 |--------|----------|--------------|----------|
 | REQ-01 | memory.delete メソッド追加 | TestDelete_Note_Success | internal/jsonrpc/handler.go:handleDelete |
 | REQ-02 | Note物理削除 | TestDelete_Note_Success | internal/store/sqlite.go:Delete |
-| REQ-03 | GlobalConfig物理削除 | TestDelete_GlobalConfig_Success | internal/store/sqlite.go:DeleteGlobal |
+| REQ-03 | GlobalConfig物理削除（ID指定） | TestDelete_GlobalConfig_Success | internal/store/sqlite.go:DeleteGlobalByID |
 | REQ-04 | ID必須バリデーション | TestDelete_EmptyID | internal/jsonrpc/methods.go:handleDelete |
-| REQ-05 | Note優先検索 | TestDelete_Note_Priority | internal/service/note.go:Delete |
+| REQ-05 | Note優先検索 | TestDelete_Note_Priority | internal/jsonrpc/methods.go:handleDelete |
 | REQ-06 | NotFound エラー | TestDelete_NotFound | internal/jsonrpc/handler.go:mapError |
-| REQ-07 | Memory Store対応 | TestMemoryStore_Delete | internal/store/memory.go:Delete |
-| REQ-08 | SQLite Store対応 | TestSQLiteStore_Delete | internal/store/sqlite.go:Delete |
-| REQ-09 | Python Client追加 | test_client_delete | clients/python/mcp_memory_client.py |
-| REQ-10 | LangGraph Tool追加 | - | clients/python/langgraph_tools.py |
-| REQ-11 | Skill定義更新 | - | .claude/skills/memory/SKILL.md |
+| REQ-07 | Memory Store対応 | TestMemoryStore_Delete, TestMemoryStore_DeleteGlobalByID | internal/store/memory.go |
+| REQ-08 | SQLite Store対応 | TestSQLiteStore_Delete, TestSQLiteStore_DeleteGlobalByID | internal/store/sqlite.go |
+| REQ-09 | Chroma Store stub | TestChromaStore_DeleteGlobalByID_NotSupported | internal/store/chroma.go |
+| REQ-10 | Python Client追加 | test_client_delete | clients/python/mcp_memory_client.py |
+| REQ-11 | LangGraph Tool追加 | - | clients/python/langgraph_tools.py |
+| REQ-12 | Skill定義更新 | - | .claude/skills/memory/SKILL.md |
+| REQ-13 | README更新 | - | README.md |
 
 ## 仕様追記案 (`requirements/embedded_spec.md`)
 
@@ -110,15 +120,16 @@ Output:
 
 - 物理削除を実行
 - 検索順序: Note → GlobalConfig（Noteを優先）
+- Note/GlobalConfig共にUUID v4形式（衝突なし）
 - 指定IDが存在しない場合は Not found エラー (-32001)
 ```
 
 ## 実装順序
 
 1. **仕様追記**: `requirements/embedded_spec.md` に memory.delete 追加
-2. **Store interface**: `DeleteGlobal` メソッド追加
+2. **Store interface**: `GetGlobalByID`, `DeleteGlobalByID` メソッド追加
 3. **Store 実装**: SQLite, Memory, Chroma（stub）
-4. **Service 層**: NoteService.Delete, GlobalService.DeleteGlobal
+4. **Service 層**: NoteService.Delete, GlobalService.DeleteByID
 5. **JSON-RPC Handler**: memory.delete ハンドラー
 6. **テスト**: 単体テスト + E2Eテスト
 7. **Python Client**: delete メソッド追加
@@ -132,19 +143,25 @@ Output:
 
 ```go
 // internal/jsonrpc/handler_test.go
-func TestDelete_Note_Success(t *testing.T)
-func TestDelete_GlobalConfig_Success(t *testing.T)
-func TestDelete_EmptyID(t *testing.T)
-func TestDelete_NotFound(t *testing.T)
-func TestDelete_Note_Priority(t *testing.T)
+func TestDelete_Note_Success(t *testing.T)           // 正常系: Note削除
+func TestDelete_GlobalConfig_Success(t *testing.T)  // 正常系: GlobalConfig削除
+func TestDelete_EmptyID(t *testing.T)               // 異常系: ID空
+func TestDelete_NotFound(t *testing.T)              // 異常系: 存在しないID
+func TestDelete_Note_Priority(t *testing.T)         // 境界値: Note優先確認
 
 // internal/store/sqlite_test.go
 func TestSQLiteStore_Delete(t *testing.T)
-func TestSQLiteStore_DeleteGlobal(t *testing.T)
+func TestSQLiteStore_DeleteGlobalByID(t *testing.T)
+func TestSQLiteStore_Delete_NotFound(t *testing.T)        // 異常系: 存在しないID
+func TestSQLiteStore_Delete_AfterDelete(t *testing.T)     // 境界値: 削除後の再取得
+func TestSQLiteStore_Delete_AlreadyDeleted(t *testing.T)  // 境界値: 既削除の再削除
 
 // internal/store/memory_test.go
 func TestMemoryStore_Delete(t *testing.T)
-func TestMemoryStore_DeleteGlobal(t *testing.T)
+func TestMemoryStore_DeleteGlobalByID(t *testing.T)
+
+// internal/store/chroma_test.go
+func TestChromaStore_DeleteGlobalByID_NotSupported(t *testing.T)  // stub確認
 ```
 
 ### E2Eテスト
@@ -154,6 +171,7 @@ func TestMemoryStore_DeleteGlobal(t *testing.T)
 func TestE2E_DeleteNote(t *testing.T)
 func TestE2E_DeleteGlobalConfig(t *testing.T)
 func TestE2E_DeleteNotFound(t *testing.T)
+func TestE2E_DeleteThenGet(t *testing.T)  // 削除後の再取得でNotFound確認
 ```
 
 ## 完了条件
