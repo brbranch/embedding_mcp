@@ -125,6 +125,45 @@ def memory_get_note(note_id: str) -> str:
 
 
 @tool
+def memory_update_note(
+    note_id: str,
+    title: str | None = None,
+    text: str | None = None,
+    tags: list[str] | None = None,
+    source: str | None = None,
+    group_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> str:
+    """Update an existing note (patch).
+
+    Args:
+        note_id: Note ID
+        title: New title (optional)
+        text: New text (optional, triggers re-embedding)
+        tags: New tags (optional)
+        source: New source (optional)
+        group_id: New group ID (optional)
+        metadata: New metadata (optional)
+
+    Returns:
+        JSON string with result {"ok": true}
+    """
+    import json
+
+    client = get_client()
+    result = client.update(
+        note_id,
+        title=title,
+        text=text,
+        tags=tags,
+        source=source,
+        group_id=group_id,
+        metadata=metadata,
+    )
+    return json.dumps(result, ensure_ascii=False)
+
+
+@tool
 def memory_list_recent(
     project_id: str,
     group_id: str | None = None,
@@ -198,6 +237,7 @@ MEMORY_TOOLS = [
     memory_search,
     memory_add_note,
     memory_get_note,
+    memory_update_note,
     memory_list_recent,
     memory_upsert_global,
     memory_get_global,

@@ -201,6 +201,7 @@ agent = create_react_agent(llm, tools=MEMORY_TOOLS)
 # - memory_search: Search project memory
 # - memory_add_note: Add notes
 # - memory_get_note: Get note by ID
+# - memory_update_note: Update existing note
 # - memory_list_recent: List recent notes
 # - memory_upsert_global: Save global settings
 # - memory_get_global: Get global settings

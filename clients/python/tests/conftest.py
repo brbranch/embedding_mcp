@@ -1,4 +1,6 @@
 """Pytest configuration and fixtures."""
+from unittest.mock import MagicMock, patch
+
 import pytest
 from pytest_httpx import HTTPXMock
 
@@ -58,3 +60,54 @@ def sample_config_data():
             "dataDir": "/Users/test/.local-mcp-memory/data",
         },
     }
+
+
+@pytest.fixture
+def mock_client(sample_note_data):
+    """Mock MCPMemoryClient for langchain_tools tests."""
+    from mcp_memory_client.models import GlobalValue, ListRecentResult, Note, SearchResult
+
+    mock = MagicMock()
+
+    # search returns SearchResult
+    mock.search.return_value = SearchResult(
+        namespace="openai:text-embedding-3-small:1536",
+        results=[Note.model_validate(sample_note_data)],
+    )
+
+    # add_note returns dict
+    mock.add_note.return_value = {
+        "id": "note-new",
+        "namespace": "openai:text-embedding-3-small:1536",
+    }
+
+    # get returns Note
+    mock.get.return_value = Note.model_validate(sample_note_data)
+
+    # update returns dict
+    mock.update.return_value = {"ok": True}
+
+    # list_recent returns ListRecentResult
+    mock.list_recent.return_value = ListRecentResult(
+        namespace="openai:text-embedding-3-small:1536",
+        items=[Note.model_validate(sample_note_data)],
+    )
+
+    # upsert_global returns dict
+    mock.upsert_global.return_value = {
+        "ok": True,
+        "id": "global-123",
+        "namespace": "openai:text-embedding-3-small:1536",
+    }
+
+    # get_global returns GlobalValue
+    mock.get_global.return_value = GlobalValue(
+        namespace="openai:text-embedding-3-small:1536",
+        found=True,
+        id="global-123",
+        value={"test": "value"},
+        updated_at="2024-01-15T10:30:00Z",
+    )
+
+    with patch("mcp_memory_client.langchain_tools._client", mock):
+        yield mock
