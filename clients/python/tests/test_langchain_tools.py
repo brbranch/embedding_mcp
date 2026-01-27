@@ -76,17 +76,17 @@ class TestMemorySearch:
         assert len(parsed) == 1
         assert "id" in parsed[0]
 
-    def test_with_group_id_filter(self, mock_client):
-        """group_id filter works."""
-        result = memory_search.invoke({
-            "project_id": "/test",
-            "query": "test",
+    def test_args_passed_correctly(self, mock_client):
+        """Arguments passed to client correctly."""
+        memory_search.invoke({
+            "project_id": "/test/project",
+            "query": "search query",
             "group_id": "feature-1",
+            "top_k": 10,
         })
-        assert isinstance(json.loads(result), list)
-        mock_client.search.assert_called_once()
-        call_kwargs = mock_client.search.call_args
-        assert call_kwargs[1]["group_id"] == "feature-1"
+        mock_client.search.assert_called_once_with(
+            "/test/project", "search query", group_id="feature-1", top_k=10
+        )
 
 
 class TestMemoryAddNote:
@@ -103,19 +103,19 @@ class TestMemoryAddNote:
         assert "id" in parsed
         assert "namespace" in parsed
 
-    def test_with_optional_params(self, mock_client):
-        """Optional params passed correctly."""
+    def test_args_passed_correctly(self, mock_client):
+        """Arguments passed to client correctly."""
         memory_add_note.invoke({
-            "project_id": "/test",
-            "group_id": "global",
-            "text": "test note",
+            "project_id": "/test/project",
+            "group_id": "feature-1",
+            "text": "note content",
             "title": "Test Title",
             "tags": ["tag1", "tag2"],
         })
-        mock_client.add_note.assert_called_once()
-        call_args = mock_client.add_note.call_args
-        assert call_args[1]["title"] == "Test Title"
-        assert call_args[1]["tags"] == ["tag1", "tag2"]
+        mock_client.add_note.assert_called_once_with(
+            "/test/project", "feature-1", "note content",
+            title="Test Title", tags=["tag1", "tag2"]
+        )
 
 
 class TestMemoryGetNote:
@@ -127,6 +127,11 @@ class TestMemoryGetNote:
         parsed = json.loads(result)
         assert "id" in parsed
         assert "text" in parsed
+
+    def test_args_passed_correctly(self, mock_client):
+        """Arguments passed to client correctly."""
+        memory_get_note.invoke({"note_id": "note-abc-123"})
+        mock_client.get.assert_called_once_with("note-abc-123")
 
 
 class TestMemoryUpdateNote:
@@ -215,6 +220,17 @@ class TestMemoryUpsertGlobal:
         assert "id" in parsed
         assert "namespace" in parsed
 
+    def test_args_passed_correctly(self, mock_client):
+        """Arguments passed to client correctly."""
+        memory_upsert_global.invoke({
+            "project_id": "/test/project",
+            "key": "global.conventions",
+            "value": {"style": "pep8"},
+        })
+        mock_client.upsert_global.assert_called_once_with(
+            "/test/project", "global.conventions", {"style": "pep8"}
+        )
+
 
 class TestMemoryGetGlobal:
     """memory_get_global tests."""
@@ -226,3 +242,11 @@ class TestMemoryGetGlobal:
         assert "found" in parsed
         assert parsed["found"] is True
         assert "value" in parsed
+
+    def test_args_passed_correctly(self, mock_client):
+        """Arguments passed to client correctly."""
+        memory_get_global.invoke({
+            "project_id": "/test/project",
+            "key": "global.conventions",
+        })
+        mock_client.get_global.assert_called_once_with("/test/project", "global.conventions")
