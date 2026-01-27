@@ -1,13 +1,22 @@
 # Phase 2 Task 4: VectorStore抽象化とChroma実装 (internal/store) 実装計画
 
+**注意**: この計画書はChromaStore完全実装を想定していますが、実際にはスタブのみが実装されました。MemoryStoreとSQLiteStoreが実装済みです。
+
 ## 1. 概要
 
 `internal/store` パッケージは以下の機能を提供する:
 
 1. **Store interface定義**: Note/GlobalConfigのCRUD操作とベクトル検索の抽象化
-2. **Chroma実装**: `github.com/amikos-tech/chroma-go` を使用したベクトルストア
+2. **Chroma実装**: `github.com/amikos-tech/chroma-go` を使用したベクトルストア（**未実装、スタブのみ**）
 3. **namespace分離**: Chromaのcollection単位でnamespace（provider:model:dim）を管理
 4. **検索フィルタ**: tags（AND検索）、since/until（時刻範囲）のサポート
+
+## 実装状況
+
+- ✅ **Store interface**: 実装済み (internal/store/store.go, types.go)
+- ✅ **MemoryStore**: 完全実装（テスト・開発用）
+- ✅ **SQLiteStore**: 完全実装（Phase 11 Task 15で追加、軽量用途向け）
+- ❌ **ChromaStore**: スタブのみ（internal/store/chroma.go、全メソッドが未実装エラーを返す）
 
 ## 2. 作成するファイル一覧
 

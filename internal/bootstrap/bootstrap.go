@@ -58,6 +58,16 @@ func Initialize(ctx context.Context, configPath string) (*Services, func(), erro
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create store: %w", err)
 		}
+	case "sqlite":
+		// SQLiteのDBパスを決定
+		dbPath := cfg.Paths.DataDir + "/memory.db"
+		if cfg.Store.Path != nil && *cfg.Store.Path != "" {
+			dbPath = *cfg.Store.Path
+		}
+		st, err = store.NewSQLiteStore(dbPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create sqlite store: %w", err)
+		}
 	default:
 		st = store.NewMemoryStore()
 	}

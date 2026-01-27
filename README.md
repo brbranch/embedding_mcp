@@ -245,7 +245,7 @@ Claude Code から JSON-RPC 2.0 で呼び出せるローカル RAG メモリ基�
 - 会話メモ/仕様/ノートの保存と検索
 - プロジェクト単位・グループ単位でのメモ管理
 - OpenAI による埋め込み生成（Ollama は将来実装予定）
-- MemoryStore（インメモリ）によるベクトル検索（Chroma/SQLite は将来実装予定）
+- MemoryStore（インメモリ）、SQLiteStore（軽量用途）によるベクトル検索（Chroma は将来実装予定）
 
 ## ビルド方法
 
@@ -441,7 +441,8 @@ type GlobalConfig struct {
     "apiKey": "sk-..."
   },
   "store": {
-    "type": "chroma"
+    "type": "sqlite",
+    "path": "~/.local-mcp-memory/data/memory.db"
   },
   "paths": {
     "configPath": "~/.local-mcp-memory/config.json",
@@ -449,6 +450,35 @@ type GlobalConfig struct {
   }
 }
 ```
+
+**Store Type:**
+- `"sqlite"`: 軽量用途（5,000件程度まで推奨、cgo不要）**← 推奨**
+- `"chroma"`: 大規模用途（**未実装**、スタブのみ）
+- 省略時: `"chroma"`（デフォルト設定だが未実装のためMemoryStoreが使用される）
+
+**推奨設定**: 本番環境では `"sqlite"` を使用してください。
+
+**SQLite設定例:**
+```json
+{
+  "store": {
+    "type": "sqlite",
+    "path": "/path/to/custom/memory.db"
+  }
+}
+```
+
+**Chroma設定例（未実装）:**
+```json
+{
+  "store": {
+    "type": "chroma",
+    "url": "http://localhost:8000"
+  }
+}
+```
+
+**注意**: ChromaStoreは現在未実装（スタブのみ）です。この設定を行っても、実際にはMemoryStoreが使用されます。
 
 **注**: `embedder.apiKey` に OpenAI API キーを設定できます。
 
@@ -509,13 +539,13 @@ SearchOptions{
 
 ### 実装
 
-- **MemoryStore**: テスト用インメモリ実装
-- **SQLiteStore**: 軽量用途向けSQLite実装（5,000件程度まで推奨）
-- **ChromaStore**: Chroma連携（実装予定）
+- **MemoryStore**: テスト・開発用インメモリ実装（実装済み）
+- **SQLiteStore**: 軽量用途向けSQLite実装（実装済み、5,000件程度まで推奨、cgo不要）
+- **ChromaStore**: Chroma連携（**未実装**、スタブのみ存在）
 
-### Chromaのセットアップ（将来実装予定）
+### Chromaのセットアップ（未実装）
 
-Chroma連携機能は現在開発中です。完成後は以下の方法で使用できます:
+**重要**: ChromaStore連携は現在未実装です（スタブのみ）。実装完了後は以下の方法で使用できます:
 
 **サーバーモード:**
 
@@ -532,7 +562,7 @@ chroma run --host localhost --port 8000
 
 **現在の状態:**
 
-現在はMemoryStore（インメモリ実装）を使用しています。これはテスト・開発用途向けで、サーバー再起動時にデータは失われます。本番環境ではChroma実装完成後に切り替えてください。
+デフォルトではChromaを指定していますが、Chroma未実装のためMemoryStoreが使用されます。本番環境では設定ファイルで `"store": {"type": "sqlite"}` を指定してSQLiteStoreを使用してください。MemoryStoreはサーバー再起動時にデータが失われます。
 
 **注**: Embedded mode（インプロセスでのChroma実行）は現在未対応です。
 
@@ -873,7 +903,22 @@ SQLiteStoreは軽量用途（5,000件程度まで）向けの組み込みベク�
 - 5,000件超過時に警告ログ出力
 - namespace分離対応
 
-**使用例（プログラムから）:**
+**MCPサーバーでの使用:**
+
+設定ファイル（`~/.local-mcp-memory/config.json`）で以下のように設定します:
+
+```json
+{
+  "store": {
+    "type": "sqlite",
+    "path": "~/.local-mcp-memory/data/memory.db"
+  }
+}
+```
+
+`path`を省略すると、デフォルトで`<dataDir>/memory.db`が使用されます。
+
+**プログラムから直接使用する場合:**
 
 ```go
 import "github.com/brbranch/embedding_mcp/internal/store"
@@ -891,12 +936,22 @@ err = sqliteStore.Initialize(ctx, "openai:text-embedding-3-small:1536")
 ```
 
 **注意:**
-- 大規模データ（5,000件超）の場合はChromaStoreを推奨
+- 大規模データ（5,000件超）の場合はChromaStoreを推奨（将来実装予定）
 - 全件スキャン方式のため、件数が増えると検索が遅くなります
 
 ## 開発状況
 
-コア機能は実装済みです。以下は将来実装予定:
+### 実装済み
+- ✅ **MemoryStore**: インメモリ実装（テスト・開発用）
+- ✅ **SQLiteStore**: 軽量用途向けSQLite実装（5,000件程度まで推奨）
+- ✅ **OpenAI Embedder**: OpenAI Embeddings API連携
 
-- **ChromaStore完全実装**: 現在はスタブのみ、本番環境向けChroma連携
-- **Ollama embedder**: ローカルLLMによる埋め込み生成
+### 未実装（将来実装予定）
+- ⏳ **ChromaStore**: 大規模用途向けChroma連携（現在はスタブのみ、実装すれば数万件以上のデータ対応可能）
+- ⏳ **Ollama Embedder**: ローカルLLMによる埋め込み生成（スタブあり）
+- ⏳ **Local Embedder**: ローカルモデル対応（スタブあり）
+
+**現在の推奨構成**:
+- 小規模〜中規模（〜5,000件）: **SQLiteStore** + OpenAI Embedder
+- 開発・テスト: **MemoryStore** + OpenAI Embedder
+- 大規模（5,000件超）: ChromaStore実装待ち、または他のベクトルDBを検討
