@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -162,7 +161,7 @@ func (s *MemoryStore) Search(ctx context.Context, embedding []float32, opts Sear
 
 		// tagsフィルタ（AND検索）
 		if len(opts.Tags) > 0 {
-			if !containsAllTags(entry.note.Tags, opts.Tags) {
+			if !ContainsAllTags(entry.note.Tags, opts.Tags) {
 				continue
 			}
 		}
@@ -189,7 +188,7 @@ func (s *MemoryStore) Search(ctx context.Context, embedding []float32, opts Sear
 		}
 
 		// コサイン距離を計算してスコアに変換
-		distance := cosineSimilarity(embedding, entry.embedding)
+		distance := CosineSimilarity(embedding, entry.embedding)
 		score := 1.0 - (distance / 2.0) // 0-1に正規化
 
 		results = append(results, SearchResult{
@@ -236,7 +235,7 @@ func (s *MemoryStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 
 		// tagsフィルタ（AND検索）
 		if len(opts.Tags) > 0 {
-			if !containsAllTags(entry.note.Tags, opts.Tags) {
+			if !ContainsAllTags(entry.note.Tags, opts.Tags) {
 				continue
 			}
 		}
@@ -364,46 +363,3 @@ func (s *MemoryStore) copyValue(v any) any {
 	return result
 }
 
-func containsAllTags(tags []string, targets []string) bool {
-	tagSet := make(map[string]bool)
-	for _, tag := range tags {
-		tagSet[tag] = true
-	}
-
-	for _, target := range targets {
-		if !tagSet[target] {
-			return false
-		}
-	}
-
-	return true
-}
-
-// cosineSimilarity はコサイン類似度を計算する（実際はcosine distanceを返す: 0=同一、2=正反対）
-func cosineSimilarity(a, b []float32) float64 {
-	if len(a) != len(b) {
-		return 2.0
-	}
-
-	var dotProduct, normA, normB float64
-	for i := range a {
-		dotProduct += float64(a[i]) * float64(b[i])
-		normA += float64(a[i]) * float64(a[i])
-		normB += float64(b[i]) * float64(b[i])
-	}
-
-	normA = math.Sqrt(normA)
-	normB = math.Sqrt(normB)
-
-	if normA == 0 || normB == 0 {
-		return 2.0
-	}
-
-	// cosine similarity: -1 to 1
-	similarity := dotProduct / (normA * normB)
-
-	// cosine distance: 0 to 2
-	distance := 1.0 - similarity
-
-	return distance
-}

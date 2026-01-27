@@ -421,7 +421,7 @@ func TestChromaStore_Search_TagsFilter_AND(t *testing.T) {
 	}
 
 	for _, r := range results {
-		if !containsAllTags(r.Note.Tags, []string{"go", "test"}) {
+		if !ContainsAllTags(r.Note.Tags, []string{"go", "test"}) {
 			t.Errorf("Result should contain both 'go' and 'test' tags, got %v", r.Note.Tags)
 		}
 	}
