@@ -928,6 +928,88 @@ func TestSQLiteStore_GetGlobal_NotFound(t *testing.T) {
 	}
 }
 
+// TestSQLiteStore_GetGlobalByID_Found はID指定でのconfig取得をテスト
+func TestSQLiteStore_GetGlobalByID_Found(t *testing.T) {
+	store := setupInitializedSQLiteStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	updatedAt := "2024-01-01T00:00:00Z"
+	config := &model.GlobalConfig{
+		ID:        "global-byid-test",
+		ProjectID: testSQLiteProjectID,
+		Key:       "global.byid.key",
+		Value:     "test-value",
+		UpdatedAt: &updatedAt,
+	}
+
+	if err := store.UpsertGlobal(ctx, config); err != nil {
+		t.Fatalf("UpsertGlobal failed: %v", err)
+	}
+
+	retrieved, err := store.GetGlobalByID(ctx, "global-byid-test")
+	if err != nil {
+		t.Fatalf("GetGlobalByID failed: %v", err)
+	}
+	if retrieved.Key != "global.byid.key" {
+		t.Errorf("Expected key 'global.byid.key', got '%s'", retrieved.Key)
+	}
+}
+
+// TestSQLiteStore_GetGlobalByID_NotFound は存在しないID取得をテスト
+func TestSQLiteStore_GetGlobalByID_NotFound(t *testing.T) {
+	store := setupInitializedSQLiteStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	_, err := store.GetGlobalByID(ctx, "nonexistent-id")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
+// TestSQLiteStore_DeleteGlobalByID_Success はGlobalConfig削除をテスト
+func TestSQLiteStore_DeleteGlobalByID_Success(t *testing.T) {
+	store := setupInitializedSQLiteStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	updatedAt := "2024-01-01T00:00:00Z"
+	config := &model.GlobalConfig{
+		ID:        "global-delete-test",
+		ProjectID: testSQLiteProjectID,
+		Key:       "global.delete.key",
+		Value:     "to-be-deleted",
+		UpdatedAt: &updatedAt,
+	}
+
+	if err := store.UpsertGlobal(ctx, config); err != nil {
+		t.Fatalf("UpsertGlobal failed: %v", err)
+	}
+
+	if err := store.DeleteGlobalByID(ctx, "global-delete-test"); err != nil {
+		t.Fatalf("DeleteGlobalByID failed: %v", err)
+	}
+
+	// 削除後は取得できない
+	_, err := store.GetGlobalByID(ctx, "global-delete-test")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+// TestSQLiteStore_DeleteGlobalByID_NotFound は存在しないID削除をテスト
+func TestSQLiteStore_DeleteGlobalByID_NotFound(t *testing.T) {
+	store := setupInitializedSQLiteStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	err := store.DeleteGlobalByID(ctx, "nonexistent-id")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
 // TestSQLiteStore_Close はDB接続クローズをテスト
 func TestSQLiteStore_Close(t *testing.T) {
 	store := setupInitializedSQLiteStore(t)
