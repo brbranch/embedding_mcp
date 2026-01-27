@@ -348,12 +348,12 @@
   - 全9メソッド対応（add_note, search, get, update, list_recent, get_config, set_config, upsert_global, get_global）
   - 型ヒント付き
   - 接続設定（base_url, timeout）、エラーハンドリング方針は実装時に決定
-- [ ] LangGraph Tool定義サンプル
+- [x] LangGraph Tool定義サンプル
   - @tool デコレータでの定義例
   - memory_search, memory_add_note 等
   - 対象LangGraphバージョン、ツール登録方法の詳細は実装時に決定
-- [ ] pyproject.toml / setup.py
-- [ ] 使用例ドキュメント
+- [x] pyproject.toml / setup.py
+- [x] 使用例ドキュメント
 
 **完了条件**: LangGraphからmcp-memoryのメソッドを呼び出せること
 
