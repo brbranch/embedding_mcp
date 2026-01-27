@@ -225,6 +225,15 @@ AI: memory.search で関連メモを検索して回答
 }
 ```
 
+### ケース4: 古いメモの削除
+
+```json
+// memory.delete
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
 ---
 
 ## 概要
@@ -634,6 +643,7 @@ response := handler.Handle(ctx, requestBytes)
 | `memory.search` | ベクトル検索（topKデフォルト: 5） |
 | `memory.get` | ノート取得 |
 | `memory.update` | ノート更新 |
+| `memory.delete` | ノート/グローバル設定削除（物理削除） |
 | `memory.list_recent` | 最新ノート取得 |
 | `memory.get_config` | 設定取得 |
 | `memory.set_config` | 設定変更 |

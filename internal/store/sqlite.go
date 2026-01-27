@@ -572,6 +572,85 @@ func (s *SQLiteStore) GetGlobal(ctx context.Context, projectID, key string) (*mo
 	return config, true, nil
 }
 
+// GetGlobalByID はIDでグローバル設定を取得する
+func (s *SQLiteStore) GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	var (
+		gID, pID, k string
+		valueJSON   sql.NullString
+		updatedAt   sql.NullString
+	)
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, project_id, key, value, updated_at
+		FROM global_configs
+		WHERE id = ? AND namespace = ?
+	`, id, s.namespace).Scan(&gID, &pID, &k, &valueJSON, &updatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get global config by id: %w", err)
+	}
+
+	config := &model.GlobalConfig{
+		ID:        gID,
+		ProjectID: pID,
+		Key:       k,
+	}
+
+	if valueJSON.Valid && valueJSON.String != "" {
+		var value any
+		if err := json.Unmarshal([]byte(valueJSON.String), &value); err == nil {
+			config.Value = value
+		} else {
+			config.Value = valueJSON.String
+		}
+	}
+
+	if updatedAt.Valid {
+		ua := updatedAt.String
+		config.UpdatedAt = &ua
+	}
+
+	return config, nil
+}
+
+// DeleteGlobalByID はIDでグローバル設定を削除する
+func (s *SQLiteStore) DeleteGlobalByID(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM global_configs WHERE id = ? AND namespace = ?
+	`, id, s.namespace)
+	if err != nil {
+		return fmt.Errorf("failed to delete global config: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
 // Helper functions
 
 func (s *SQLiteStore) countNotes(ctx context.Context) (int, error) {

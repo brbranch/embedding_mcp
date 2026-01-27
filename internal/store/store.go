@@ -24,6 +24,8 @@ type Store interface {
 	// GlobalConfig操作
 	UpsertGlobal(ctx context.Context, config *model.GlobalConfig) error
 	GetGlobal(ctx context.Context, projectID, key string) (*model.GlobalConfig, bool, error)
+	GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error)
+	DeleteGlobalByID(ctx context.Context, id string) error
 
 	// 初期化・終了
 	Initialize(ctx context.Context, namespace string) error

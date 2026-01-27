@@ -16,6 +16,7 @@ type mockNoteService struct {
 	searchFunc     func(ctx context.Context, req *service.SearchRequest) (*service.SearchResponse, error)
 	getFunc        func(ctx context.Context, id string) (*service.GetResponse, error)
 	updateFunc     func(ctx context.Context, req *service.UpdateRequest) error
+	deleteFunc     func(ctx context.Context, id string) error
 	listRecentFunc func(ctx context.Context, req *service.ListRecentRequest) (*service.ListRecentResponse, error)
 }
 
@@ -43,6 +44,13 @@ func (m *mockNoteService) Get(ctx context.Context, id string) (*service.GetRespo
 func (m *mockNoteService) Update(ctx context.Context, req *service.UpdateRequest) error {
 	if m.updateFunc != nil {
 		return m.updateFunc(ctx, req)
+	}
+	return nil
+}
+
+func (m *mockNoteService) Delete(ctx context.Context, id string) error {
+	if m.deleteFunc != nil {
+		return m.deleteFunc(ctx, id)
 	}
 	return nil
 }
@@ -81,6 +89,7 @@ func (m *mockConfigService) SetConfig(ctx context.Context, req *service.SetConfi
 type mockGlobalService struct {
 	upsertGlobalFunc func(ctx context.Context, req *service.UpsertGlobalRequest) (*service.UpsertGlobalResponse, error)
 	getGlobalFunc    func(ctx context.Context, projectID, key string) (*service.GetGlobalResponse, error)
+	deleteByIDFunc   func(ctx context.Context, id string) error
 }
 
 func (m *mockGlobalService) UpsertGlobal(ctx context.Context, req *service.UpsertGlobalRequest) (*service.UpsertGlobalResponse, error) {
@@ -95,6 +104,13 @@ func (m *mockGlobalService) GetGlobal(ctx context.Context, projectID, key string
 		return m.getGlobalFunc(ctx, projectID, key)
 	}
 	return &service.GetGlobalResponse{Namespace: "test-ns", Found: false}, nil
+}
+
+func (m *mockGlobalService) DeleteByID(ctx context.Context, id string) error {
+	if m.deleteByIDFunc != nil {
+		return m.deleteByIDFunc(ctx, id)
+	}
+	return nil
 }
 
 // === ヘルパー関数 ===
@@ -955,5 +971,104 @@ func TestHandle_AddNote_EmptyGroupId(t *testing.T) {
 
 	if resp.Error.Code != model.ErrCodeInvalidParams {
 		t.Errorf("expected code %d, got %d", model.ErrCodeInvalidParams, resp.Error.Code)
+	}
+}
+
+// === 13. memory.delete テスト ===
+
+func TestHandle_Delete_NoteSuccess(t *testing.T) {
+	h := newTestHandler()
+	h.noteService = &mockNoteService{
+		deleteFunc: func(ctx context.Context, id string) error {
+			if id != "test-note-id" {
+				t.Errorf("expected id 'test-note-id', got %q", id)
+			}
+			return nil
+		},
+	}
+	params := map[string]any{
+		"id": "test-note-id",
+	}
+	req := makeRequest("memory.delete", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseResponse(t, result)
+
+	if resp["error"] != nil {
+		t.Errorf("unexpected error: %v", resp["error"])
+	}
+	resultMap := resp["result"].(map[string]any)
+	if resultMap["ok"] != true {
+		t.Error("expected ok: true in result")
+	}
+}
+
+func TestHandle_Delete_GlobalConfigSuccess(t *testing.T) {
+	h := newTestHandler()
+	// Note削除でNotFound、GlobalConfig削除で成功
+	h.noteService = &mockNoteService{
+		deleteFunc: func(ctx context.Context, id string) error {
+			return service.ErrNoteNotFound
+		},
+	}
+	h.globalService = &mockGlobalService{
+		deleteByIDFunc: func(ctx context.Context, id string) error {
+			if id != "test-global-id" {
+				t.Errorf("expected id 'test-global-id', got %q", id)
+			}
+			return nil
+		},
+	}
+	params := map[string]any{
+		"id": "test-global-id",
+	}
+	req := makeRequest("memory.delete", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseResponse(t, result)
+
+	if resp["error"] != nil {
+		t.Errorf("unexpected error: %v", resp["error"])
+	}
+	resultMap := resp["result"].(map[string]any)
+	if resultMap["ok"] != true {
+		t.Error("expected ok: true in result")
+	}
+}
+
+func TestHandle_Delete_EmptyID(t *testing.T) {
+	h := newTestHandler()
+	params := map[string]any{
+		"id": "",
+	}
+	req := makeRequest("memory.delete", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseErrorResponse(t, result)
+
+	if resp.Error.Code != model.ErrCodeInvalidParams {
+		t.Errorf("expected code %d, got %d", model.ErrCodeInvalidParams, resp.Error.Code)
+	}
+}
+
+func TestHandle_Delete_NotFound(t *testing.T) {
+	h := newTestHandler()
+	// Note削除でNotFound、GlobalConfig削除でもNotFound
+	h.noteService = &mockNoteService{
+		deleteFunc: func(ctx context.Context, id string) error {
+			return service.ErrNoteNotFound
+		},
+	}
+	h.globalService = &mockGlobalService{
+		deleteByIDFunc: func(ctx context.Context, id string) error {
+			return service.ErrGlobalConfigNotFound
+		},
+	}
+	params := map[string]any{
+		"id": "nonexistent-id",
+	}
+	req := makeRequest("memory.delete", params)
+	result := h.Handle(context.Background(), req)
+	resp := parseErrorResponse(t, result)
+
+	if resp.Error.Code != model.ErrCodeNotFound {
+		t.Errorf("expected code %d, got %d", model.ErrCodeNotFound, resp.Error.Code)
 	}
 }

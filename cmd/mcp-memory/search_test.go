@@ -266,6 +266,10 @@ func (m *mockNoteService) Update(ctx context.Context, req *service.UpdateRequest
 	return nil
 }
 
+func (m *mockNoteService) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
 func (m *mockNoteService) ListRecent(ctx context.Context, req *service.ListRecentRequest) (*service.ListRecentResponse, error) {
 	return nil, nil
 }

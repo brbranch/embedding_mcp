@@ -81,6 +81,8 @@ func (h *Handler) dispatch(ctx context.Context, id any, method string, params an
 		return h.handleUpsertGlobal(ctx, params)
 	case "memory.get_global":
 		return h.handleGetGlobal(ctx, params)
+	case "memory.delete":
+		return h.handleDelete(ctx, params)
 	default:
 		return nil, &methodNotFoundError{method: method}
 	}
@@ -102,13 +104,20 @@ func (h *Handler) mapError(id any, err error) *model.ErrorResponse {
 		errors.Is(err, service.ErrQueryRequired) ||
 		errors.Is(err, service.ErrIDRequired) ||
 		errors.Is(err, service.ErrInvalidTimeFormat) ||
-		errors.Is(err, errKeyRequired) {
+		errors.Is(err, errKeyRequired) ||
+		errors.Is(err, errIDRequired) {
 		return model.NewInvalidParams(id, err.Error())
 	}
 
 	// not found
 	if errors.Is(err, service.ErrNoteNotFound) {
 		return model.NewErrorResponse(id, model.ErrCodeNotFound, "Note not found", nil)
+	}
+	if errors.Is(err, service.ErrGlobalConfigNotFound) {
+		return model.NewErrorResponse(id, model.ErrCodeNotFound, "Global config not found", nil)
+	}
+	if errors.Is(err, errNotFound) {
+		return model.NewErrorResponse(id, model.ErrCodeNotFound, "Not found", nil)
 	}
 
 	// invalid key prefix
@@ -146,3 +155,9 @@ func (e *methodNotFoundError) Error() string {
 
 // errKeyRequired はkey必須エラー
 var errKeyRequired = errors.New("key is required")
+
+// errIDRequired はID必須エラー
+var errIDRequired = errors.New("id is required")
+
+// errNotFound はNot Foundエラー（Note/GlobalConfig両方で見つからない場合）
+var errNotFound = errors.New("not found")

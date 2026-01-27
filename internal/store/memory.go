@@ -312,6 +312,53 @@ func (s *MemoryStore) GetGlobal(ctx context.Context, projectID, key string) (*mo
 	return configCopy, true, nil
 }
 
+// GetGlobalByID はIDでグローバル設定を取得する
+func (s *MemoryStore) GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	// ID で全件検索
+	for _, config := range s.globalConfigs {
+		if config.ID == id {
+			// ディープコピー
+			configCopy := &model.GlobalConfig{
+				ID:        config.ID,
+				ProjectID: config.ProjectID,
+				Key:       config.Key,
+				Value:     s.copyValue(config.Value),
+				UpdatedAt: config.UpdatedAt,
+			}
+			return configCopy, nil
+		}
+	}
+
+	return nil, ErrNotFound
+}
+
+// DeleteGlobalByID はIDでグローバル設定を削除する
+func (s *MemoryStore) DeleteGlobalByID(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	// ID で検索して削除
+	for key, config := range s.globalConfigs {
+		if config.ID == id {
+			delete(s.globalConfigs, key)
+			return nil
+		}
+	}
+
+	return ErrNotFound
+}
+
 // Helper methods
 
 func (s *MemoryStore) globalKey(projectID, key string) string {

@@ -129,3 +129,21 @@ func (s *globalService) GetGlobal(ctx context.Context, projectID, key string) (*
 		UpdatedAt: globalConfig.UpdatedAt,
 	}, nil
 }
+
+// DeleteByID はIDでグローバル設定を削除する
+func (s *globalService) DeleteByID(ctx context.Context, id string) error {
+	// バリデーション
+	if id == "" {
+		return ErrIDRequired
+	}
+
+	// Storeから削除
+	if err := s.store.DeleteGlobalByID(ctx, id); err != nil {
+		if err == store.ErrNotFound {
+			return ErrGlobalConfigNotFound
+		}
+		return fmt.Errorf("failed to delete global config: %w", err)
+	}
+
+	return nil
+}
