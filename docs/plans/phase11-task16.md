@@ -91,12 +91,12 @@ DeleteGlobalByID(ctx context.Context, id string) error
 
 | 要件ID | TODO項目 | テストケース | 実装箇所 |
 |--------|----------|--------------|----------|
-| REQ-01 | memory.delete メソッド追加 | TestDelete_Note_Success | internal/jsonrpc/handler.go:handleDelete |
+| REQ-01 | memory.delete メソッド追加 | TestDelete_Note_Success | internal/jsonrpc/methods.go:handleDelete |
 | REQ-02 | Note物理削除 | TestDelete_Note_Success | internal/store/sqlite.go:Delete |
 | REQ-03 | GlobalConfig物理削除（ID指定） | TestDelete_GlobalConfig_Success | internal/store/sqlite.go:DeleteGlobalByID |
 | REQ-04 | ID必須バリデーション | TestDelete_EmptyID | internal/jsonrpc/methods.go:handleDelete |
 | REQ-05 | Note優先検索 | TestDelete_Note_Priority | internal/jsonrpc/methods.go:handleDelete |
-| REQ-06 | NotFound エラー | TestDelete_NotFound | internal/jsonrpc/handler.go:mapError |
+| REQ-06 | NotFound エラー | TestDelete_NotFound | internal/jsonrpc/methods.go:handleDelete |
 | REQ-07 | Memory Store対応 | TestMemoryStore_Delete, TestMemoryStore_DeleteGlobalByID | internal/store/memory.go |
 | REQ-08 | SQLite Store対応 | TestSQLiteStore_Delete, TestSQLiteStore_DeleteGlobalByID | internal/store/sqlite.go |
 | REQ-09 | Chroma Store stub | TestChromaStore_DeleteGlobalByID_NotSupported | internal/store/chroma.go |
