@@ -1,6 +1,9 @@
 # Binary
 mcp-memory
 
+# goreleaser output
+dist/
+
 # Test coverage
 *.out
 *.coverprofile

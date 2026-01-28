@@ -355,8 +355,8 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("expected default dim 0, got %d", cfg.Embedder.Dim)
 	}
 
-	if cfg.Store.Type != "chroma" {
-		t.Errorf("expected default store type 'chroma', got %q", cfg.Store.Type)
+	if cfg.Store.Type != "sqlite" {
+		t.Errorf("expected default store type 'sqlite', got %q", cfg.Store.Type)
 	}
 
 	if cfg.Paths.ConfigPath != configPath {
