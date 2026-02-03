@@ -73,13 +73,13 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 		return ErrConnectionFailed
 	}
 
-	// コレクション存在確認
+	// Note用コレクション存在確認
 	exists, err := s.client.CollectionExists(ctx, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to check collection existence: %w", err)
 	}
 
-	// コレクションが存在しない場合は作成
+	// Note用コレクションが存在しない場合は作成
 	if !exists {
 		err = s.client.CreateCollection(ctx, &qdrant.CreateCollection{
 			CollectionName: namespace,
@@ -90,6 +90,44 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create collection: %w", err)
+		}
+	}
+
+	// GlobalConfig用コレクション作成
+	globalConfigCollection := namespace + "_global_configs"
+	exists, err = s.client.CollectionExists(ctx, globalConfigCollection)
+	if err != nil {
+		return fmt.Errorf("failed to check global_configs collection existence: %w", err)
+	}
+	if !exists {
+		err = s.client.CreateCollection(ctx, &qdrant.CreateCollection{
+			CollectionName: globalConfigCollection,
+			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
+				Size:     1, // ダミーベクトル（1次元）
+				Distance: qdrant.Distance_Cosine,
+			}),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create global_configs collection: %w", err)
+		}
+	}
+
+	// Group用コレクション作成
+	groupCollection := namespace + "_groups"
+	exists, err = s.client.CollectionExists(ctx, groupCollection)
+	if err != nil {
+		return fmt.Errorf("failed to check groups collection existence: %w", err)
+	}
+	if !exists {
+		err = s.client.CreateCollection(ctx, &qdrant.CreateCollection{
+			CollectionName: groupCollection,
+			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
+				Size:     1, // ダミーベクトル（1次元）
+				Distance: qdrant.Distance_Cosine,
+			}),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create groups collection: %w", err)
 		}
 	}
 
@@ -531,56 +569,493 @@ func payloadToNote(payload map[string]*qdrant.Value) (*model.Note, error) {
 	return note, nil
 }
 
-// GlobalConfig操作（スタブ）
+// GlobalConfig操作
 
-// UpsertGlobal はGlobalConfigの新規作成または更新を行う（未実装）
+// UpsertGlobal はGlobalConfigの新規作成または更新を行う
 func (s *QdrantStore) UpsertGlobal(ctx context.Context, config *model.GlobalConfig) error {
-	return fmt.Errorf("UpsertGlobal is not implemented yet")
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	// updatedAtがnilの場合は現在時刻を設定
+	if config.UpdatedAt == nil {
+		now := time.Now().UTC().Format(time.RFC3339)
+		config.UpdatedAt = &now
+	}
+
+	// 既存のconfigを検索（projectID + key）
+	existingConfig, found, err := s.GetGlobal(ctx, config.ProjectID, config.Key)
+	if err != nil {
+		return err
+	}
+
+	// 既存があればそのIDを使用
+	if found {
+		config.ID = existingConfig.ID
+	}
+
+	// payloadを構築
+	payload := make(map[string]*qdrant.Value)
+	payload["id"], _ = qdrant.NewValue(config.ID)
+	payload["projectId"], _ = qdrant.NewValue(config.ProjectID)
+	payload["key"], _ = qdrant.NewValue(config.Key)
+	payload["updatedAt"], _ = qdrant.NewValue(*config.UpdatedAt)
+	payload["type"], _ = qdrant.NewValue("global_config")
+
+	// Valueをそのまま保存（JSON経由）
+	jsonBytes, err := json.Marshal(config.Value)
+	if err != nil {
+		return fmt.Errorf("failed to marshal value: %w", err)
+	}
+	var valueAny any
+	if err := json.Unmarshal(jsonBytes, &valueAny); err != nil {
+		return fmt.Errorf("failed to unmarshal value: %w", err)
+	}
+	payload["value"], _ = qdrant.NewValue(valueAny)
+
+	// ダミーベクトル（1次元）
+	dummyVector := []float32{1.0}
+
+	// ポイントを追加（Upsert）
+	_, err = s.client.Upsert(ctx, &qdrant.UpsertPoints{
+		CollectionName: s.namespace + "_global_configs",
+		Points: []*qdrant.PointStruct{
+			{
+				Id:      qdrant.NewIDNum(hashID(config.ID)),
+				Vectors: qdrant.NewVectors(dummyVector...),
+				Payload: payload,
+			},
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to upsert global config: %w", err)
+	}
+
+	return nil
 }
 
-// GetGlobal はProjectIDとKeyでGlobalConfigを取得する（未実装）
+// GetGlobal はProjectIDとKeyでGlobalConfigを取得する
 func (s *QdrantStore) GetGlobal(ctx context.Context, projectID, key string) (*model.GlobalConfig, bool, error) {
-	return nil, false, fmt.Errorf("GetGlobal is not implemented yet")
+	if !s.initialized {
+		return nil, false, ErrNotInitialized
+	}
+
+	// projectID + keyでフィルタ検索
+	filter := &qdrant.Filter{
+		Must: []*qdrant.Condition{
+			qdrant.NewMatch("projectId", projectID),
+			qdrant.NewMatch("key", key),
+			qdrant.NewMatch("type", "global_config"),
+		},
+	}
+
+	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
+		CollectionName: s.namespace + "_global_configs",
+		Filter:         filter,
+		Limit:          qdrant.PtrOf(uint32(1)),
+		WithPayload:    qdrant.NewWithPayload(true),
+		WithVectors:    qdrant.NewWithVectors(false),
+	})
+
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to scroll global configs: %w", err)
+	}
+
+	if len(scrollResp) == 0 {
+		return nil, false, nil
+	}
+
+	// payloadからGlobalConfigを構築
+	config, err := payloadToGlobalConfig(scrollResp[0].Payload)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to convert payload to global config: %w", err)
+	}
+
+	return config, true, nil
 }
 
-// GetGlobalByID はIDでGlobalConfigを取得する（未実装）
+// GetGlobalByID はIDでGlobalConfigを取得する
 func (s *QdrantStore) GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error) {
-	return nil, fmt.Errorf("GetGlobalByID is not implemented yet")
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	// IDでポイントを取得
+	points, err := s.client.Get(ctx, &qdrant.GetPoints{
+		CollectionName: s.namespace + "_global_configs",
+		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
+		WithPayload:    qdrant.NewWithPayload(true),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get global config: %w", err)
+	}
+
+	if len(points) == 0 {
+		return nil, ErrNotFound
+	}
+
+	// payloadからGlobalConfigを構築
+	config, err := payloadToGlobalConfig(points[0].Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert payload to global config: %w", err)
+	}
+
+	return config, nil
 }
 
-// DeleteGlobalByID はIDでGlobalConfigを削除する（未実装）
+// DeleteGlobalByID はIDでGlobalConfigを削除する
 func (s *QdrantStore) DeleteGlobalByID(ctx context.Context, id string) error {
-	return fmt.Errorf("DeleteGlobalByID is not implemented yet")
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	// 存在確認
+	points, err := s.client.Get(ctx, &qdrant.GetPoints{
+		CollectionName: s.namespace + "_global_configs",
+		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
+		WithPayload:    qdrant.NewWithPayload(false),
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to check global config existence: %w", err)
+	}
+
+	if len(points) == 0 {
+		return ErrNotFound
+	}
+
+	// ポイントを削除
+	_, err = s.client.Delete(ctx, &qdrant.DeletePoints{
+		CollectionName: s.namespace + "_global_configs",
+		Points:         qdrant.NewPointsSelector(qdrant.NewIDNum(hashID(id))),
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete global config: %w", err)
+	}
+
+	return nil
 }
 
-// Group操作（スタブ）
+// Group操作
 
-// AddGroup はグループを追加する（未実装）
+// AddGroup はグループを追加する
 func (s *QdrantStore) AddGroup(ctx context.Context, group *model.Group) error {
-	return fmt.Errorf("AddGroup is not implemented yet")
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	// payloadを構築
+	payload := make(map[string]*qdrant.Value)
+	payload["id"], _ = qdrant.NewValue(group.ID)
+	payload["projectId"], _ = qdrant.NewValue(group.ProjectID)
+	payload["groupKey"], _ = qdrant.NewValue(group.GroupKey)
+	payload["title"], _ = qdrant.NewValue(group.Title)
+	payload["description"], _ = qdrant.NewValue(group.Description)
+	payload["createdAt"], _ = qdrant.NewValue(group.CreatedAt.Format(time.RFC3339))
+	payload["updatedAt"], _ = qdrant.NewValue(group.UpdatedAt.Format(time.RFC3339))
+	payload["type"], _ = qdrant.NewValue("group")
+
+	// ダミーベクトル（1次元）
+	dummyVector := []float32{1.0}
+
+	// ポイントを追加
+	_, err := s.client.Upsert(ctx, &qdrant.UpsertPoints{
+		CollectionName: s.namespace + "_groups",
+		Points: []*qdrant.PointStruct{
+			{
+				Id:      qdrant.NewIDNum(hashID(group.ID)),
+				Vectors: qdrant.NewVectors(dummyVector...),
+				Payload: payload,
+			},
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to add group: %w", err)
+	}
+
+	return nil
 }
 
-// GetGroup はIDでグループを取得する（未実装）
+// GetGroup はIDでグループを取得する
 func (s *QdrantStore) GetGroup(ctx context.Context, id string) (*model.Group, error) {
-	return nil, fmt.Errorf("GetGroup is not implemented yet")
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	// IDでポイントを取得
+	points, err := s.client.Get(ctx, &qdrant.GetPoints{
+		CollectionName: s.namespace + "_groups",
+		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
+		WithPayload:    qdrant.NewWithPayload(true),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group: %w", err)
+	}
+
+	if len(points) == 0 {
+		return nil, ErrNotFound
+	}
+
+	// payloadからGroupを構築
+	group, err := payloadToGroup(points[0].Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert payload to group: %w", err)
+	}
+
+	return group, nil
 }
 
-// GetGroupByKey はProjectIDとGroupKeyでグループを取得する（未実装）
+// GetGroupByKey はProjectIDとGroupKeyでグループを取得する
 func (s *QdrantStore) GetGroupByKey(ctx context.Context, projectID, groupKey string) (*model.Group, error) {
-	return nil, fmt.Errorf("GetGroupByKey is not implemented yet")
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	// projectID + groupKeyでフィルタ検索
+	filter := &qdrant.Filter{
+		Must: []*qdrant.Condition{
+			qdrant.NewMatch("projectId", projectID),
+			qdrant.NewMatch("groupKey", groupKey),
+			qdrant.NewMatch("type", "group"),
+		},
+	}
+
+	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
+		CollectionName: s.namespace + "_groups",
+		Filter:         filter,
+		Limit:          qdrant.PtrOf(uint32(1)),
+		WithPayload:    qdrant.NewWithPayload(true),
+		WithVectors:    qdrant.NewWithVectors(false),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to scroll groups: %w", err)
+	}
+
+	if len(scrollResp) == 0 {
+		return nil, ErrNotFound
+	}
+
+	// payloadからGroupを構築
+	group, err := payloadToGroup(scrollResp[0].Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert payload to group: %w", err)
+	}
+
+	return group, nil
 }
 
-// UpdateGroup はグループを更新する（未実装）
+// UpdateGroup はグループを更新する
 func (s *QdrantStore) UpdateGroup(ctx context.Context, group *model.Group) error {
-	return fmt.Errorf("UpdateGroup is not implemented yet")
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	// 存在確認
+	points, err := s.client.Get(ctx, &qdrant.GetPoints{
+		CollectionName: s.namespace + "_groups",
+		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(group.ID))},
+		WithPayload:    qdrant.NewWithPayload(false),
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to check group existence: %w", err)
+	}
+
+	if len(points) == 0 {
+		return ErrNotFound
+	}
+
+	// payloadを構築
+	payload := make(map[string]*qdrant.Value)
+	payload["id"], _ = qdrant.NewValue(group.ID)
+	payload["projectId"], _ = qdrant.NewValue(group.ProjectID)
+	payload["groupKey"], _ = qdrant.NewValue(group.GroupKey)
+	payload["title"], _ = qdrant.NewValue(group.Title)
+	payload["description"], _ = qdrant.NewValue(group.Description)
+	payload["createdAt"], _ = qdrant.NewValue(group.CreatedAt.Format(time.RFC3339))
+	payload["updatedAt"], _ = qdrant.NewValue(group.UpdatedAt.Format(time.RFC3339))
+	payload["type"], _ = qdrant.NewValue("group")
+
+	// ダミーベクトル（1次元）
+	dummyVector := []float32{1.0}
+
+	// ポイントを更新（Upsert）
+	_, err = s.client.Upsert(ctx, &qdrant.UpsertPoints{
+		CollectionName: s.namespace + "_groups",
+		Points: []*qdrant.PointStruct{
+			{
+				Id:      qdrant.NewIDNum(hashID(group.ID)),
+				Vectors: qdrant.NewVectors(dummyVector...),
+				Payload: payload,
+			},
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to update group: %w", err)
+	}
+
+	return nil
 }
 
-// DeleteGroup はグループを削除する（未実装）
+// DeleteGroup はグループを削除する
 func (s *QdrantStore) DeleteGroup(ctx context.Context, id string) error {
-	return fmt.Errorf("DeleteGroup is not implemented yet")
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	// 存在確認
+	points, err := s.client.Get(ctx, &qdrant.GetPoints{
+		CollectionName: s.namespace + "_groups",
+		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
+		WithPayload:    qdrant.NewWithPayload(false),
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to check group existence: %w", err)
+	}
+
+	if len(points) == 0 {
+		return ErrNotFound
+	}
+
+	// ポイントを削除
+	_, err = s.client.Delete(ctx, &qdrant.DeletePoints{
+		CollectionName: s.namespace + "_groups",
+		Points:         qdrant.NewPointsSelector(qdrant.NewIDNum(hashID(id))),
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete group: %w", err)
+	}
+
+	return nil
 }
 
-// ListGroups はプロジェクト内のグループ一覧を取得する（未実装）
+// ListGroups はプロジェクト内のグループ一覧を取得する
 func (s *QdrantStore) ListGroups(ctx context.Context, projectID string) ([]*model.Group, error) {
-	return nil, fmt.Errorf("ListGroups is not implemented yet")
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	// projectIDでフィルタ検索
+	filter := &qdrant.Filter{
+		Must: []*qdrant.Condition{
+			qdrant.NewMatch("projectId", projectID),
+			qdrant.NewMatch("type", "group"),
+		},
+	}
+
+	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
+		CollectionName: s.namespace + "_groups",
+		Filter:         filter,
+		Limit:          qdrant.PtrOf(uint32(1000)), // 十分大きな値
+		WithPayload:    qdrant.NewWithPayload(true),
+		WithVectors:    qdrant.NewWithVectors(false),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to scroll groups: %w", err)
+	}
+
+	// payloadからGroupに変換
+	var groups []*model.Group
+	for _, point := range scrollResp {
+		group, err := payloadToGroup(point.Payload)
+		if err != nil {
+			continue
+		}
+		groups = append(groups, group)
+	}
+
+	return groups, nil
+}
+
+// payloadToGlobalConfig はQdrantのpayloadからGlobalConfigを構築する
+func payloadToGlobalConfig(payload map[string]*qdrant.Value) (*model.GlobalConfig, error) {
+	config := &model.GlobalConfig{}
+
+	if v, ok := payload["id"]; ok && v.GetStringValue() != "" {
+		config.ID = v.GetStringValue()
+	}
+	if v, ok := payload["projectId"]; ok && v.GetStringValue() != "" {
+		config.ProjectID = v.GetStringValue()
+	}
+	if v, ok := payload["key"]; ok && v.GetStringValue() != "" {
+		config.Key = v.GetStringValue()
+	}
+	if v, ok := payload["updatedAt"]; ok && v.GetStringValue() != "" {
+		updatedAt := v.GetStringValue()
+		config.UpdatedAt = &updatedAt
+	}
+
+	// Valueの取得
+	if v, ok := payload["value"]; ok {
+		// 文字列の場合
+		if strVal := v.GetStringValue(); strVal != "" {
+			config.Value = strVal
+		} else if intVal := v.GetIntegerValue(); v.GetIntegerValue() != 0 {
+			config.Value = intVal
+		} else if boolVal := v.GetBoolValue(); v.Kind != nil {
+			config.Value = boolVal
+		} else if structVal := v.GetStructValue(); structVal != nil && structVal.Fields != nil {
+			// structValueをJSONに変換
+			jsonBytes, err := json.Marshal(structVal.Fields)
+			if err == nil {
+				var value any
+				json.Unmarshal(jsonBytes, &value)
+				config.Value = value
+			}
+		} else if listVal := v.GetListValue(); listVal != nil {
+			// リスト値の場合
+			var values []any
+			for _, item := range listVal.Values {
+				if s := item.GetStringValue(); s != "" {
+					values = append(values, s)
+				}
+			}
+			config.Value = values
+		}
+	}
+
+	return config, nil
+}
+
+// payloadToGroup はQdrantのpayloadからGroupを構築する
+func payloadToGroup(payload map[string]*qdrant.Value) (*model.Group, error) {
+	group := &model.Group{}
+
+	if v, ok := payload["id"]; ok && v.GetStringValue() != "" {
+		group.ID = v.GetStringValue()
+	}
+	if v, ok := payload["projectId"]; ok && v.GetStringValue() != "" {
+		group.ProjectID = v.GetStringValue()
+	}
+	if v, ok := payload["groupKey"]; ok && v.GetStringValue() != "" {
+		group.GroupKey = v.GetStringValue()
+	}
+	if v, ok := payload["title"]; ok && v.GetStringValue() != "" {
+		group.Title = v.GetStringValue()
+	}
+	if v, ok := payload["description"]; ok && v.GetStringValue() != "" {
+		group.Description = v.GetStringValue()
+	}
+	if v, ok := payload["createdAt"]; ok && v.GetStringValue() != "" {
+		if t, err := time.Parse(time.RFC3339, v.GetStringValue()); err == nil {
+			group.CreatedAt = t
+		}
+	}
+	if v, ok := payload["updatedAt"]; ok && v.GetStringValue() != "" {
+		if t, err := time.Parse(time.RFC3339, v.GetStringValue()); err == nil {
+			group.UpdatedAt = t
+		}
+	}
+
+	return group, nil
 }

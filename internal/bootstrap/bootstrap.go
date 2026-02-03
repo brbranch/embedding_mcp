@@ -74,6 +74,15 @@ func Initialize(ctx context.Context, configPath string) (*Services, func(), erro
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create sqlite store: %w", err)
 		}
+	case "qdrant":
+		url := "http://localhost:6333"
+		if cfg.Store.URL != nil && *cfg.Store.URL != "" {
+			url = *cfg.Store.URL
+		}
+		st, err = store.NewQdrantStore(url)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create qdrant store: %w", err)
+		}
 	default:
 		st = store.NewMemoryStore()
 	}

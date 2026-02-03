@@ -45,6 +45,8 @@ func setupInitializedQdrantStore(t *testing.T) *QdrantStore {
 
 	// 既存のコレクションを削除（クリーンアップ）
 	_ = store.client.DeleteCollection(ctx, testQdrantNamespace)
+	_ = store.client.DeleteCollection(ctx, testQdrantNamespace+"_global_configs")
+	_ = store.client.DeleteCollection(ctx, testQdrantNamespace+"_groups")
 
 	if err := store.Initialize(ctx, testQdrantNamespace); err != nil {
 		t.Fatalf("Failed to initialize store: %v", err)
@@ -678,7 +680,6 @@ func TestQdrantStore_ListRecent_WithTagsFilter(t *testing.T) {
 
 // TestQdrantStore_UpsertGlobal_Insert は新規global config作成をテスト
 func TestQdrantStore_UpsertGlobal_Insert(t *testing.T) {
-	t.Skip("UpsertGlobal is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -711,7 +712,6 @@ func TestQdrantStore_UpsertGlobal_Insert(t *testing.T) {
 
 // TestQdrantStore_UpsertGlobal_Update はglobal config更新をテスト
 func TestQdrantStore_UpsertGlobal_Update(t *testing.T) {
-	t.Skip("UpsertGlobal is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -744,7 +744,6 @@ func TestQdrantStore_UpsertGlobal_Update(t *testing.T) {
 
 // TestQdrantStore_GetGlobal_Found は存在するconfig取得をテスト
 func TestQdrantStore_GetGlobal_Found(t *testing.T) {
-	t.Skip("GetGlobal is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -775,7 +774,6 @@ func TestQdrantStore_GetGlobal_Found(t *testing.T) {
 
 // TestQdrantStore_GetGlobal_NotFound は存在しないconfig取得をテスト
 func TestQdrantStore_GetGlobal_NotFound(t *testing.T) {
-	t.Skip("GetGlobal is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -792,7 +790,6 @@ func TestQdrantStore_GetGlobal_NotFound(t *testing.T) {
 
 // TestQdrantStore_GetGlobalByID_Found はID指定でのconfig取得をテスト
 func TestQdrantStore_GetGlobalByID_Found(t *testing.T) {
-	t.Skip("GetGlobalByID is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -822,7 +819,6 @@ func TestQdrantStore_GetGlobalByID_Found(t *testing.T) {
 
 // TestQdrantStore_GetGlobalByID_NotFound は存在しないID取得をテスト
 func TestQdrantStore_GetGlobalByID_NotFound(t *testing.T) {
-	t.Skip("GetGlobalByID is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -836,7 +832,6 @@ func TestQdrantStore_GetGlobalByID_NotFound(t *testing.T) {
 
 // TestQdrantStore_DeleteGlobalByID_Success はGlobalConfig削除をテスト
 func TestQdrantStore_DeleteGlobalByID_Success(t *testing.T) {
-	t.Skip("DeleteGlobalByID is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -868,7 +863,6 @@ func TestQdrantStore_DeleteGlobalByID_Success(t *testing.T) {
 
 // TestQdrantStore_DeleteGlobalByID_NotFound は存在しないID削除をテスト
 func TestQdrantStore_DeleteGlobalByID_NotFound(t *testing.T) {
-	t.Skip("DeleteGlobalByID is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -882,7 +876,6 @@ func TestQdrantStore_DeleteGlobalByID_NotFound(t *testing.T) {
 
 // TestQdrantStore_AddGroup_Basic はグループ追加をテスト
 func TestQdrantStore_AddGroup_Basic(t *testing.T) {
-	t.Skip("AddGroup is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -919,7 +912,6 @@ func TestQdrantStore_AddGroup_Basic(t *testing.T) {
 
 // TestQdrantStore_GetGroup_Found は存在するグループ取得をテスト
 func TestQdrantStore_GetGroup_Found(t *testing.T) {
-	t.Skip("GetGroup is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -948,7 +940,6 @@ func TestQdrantStore_GetGroup_Found(t *testing.T) {
 
 // TestQdrantStore_GetGroup_NotFound は存在しないグループ取得をテスト
 func TestQdrantStore_GetGroup_NotFound(t *testing.T) {
-	t.Skip("GetGroup is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -962,7 +953,6 @@ func TestQdrantStore_GetGroup_NotFound(t *testing.T) {
 
 // TestQdrantStore_GetGroupByKey_Found はProjectID+GroupKeyでグループ取得をテスト
 func TestQdrantStore_GetGroupByKey_Found(t *testing.T) {
-	t.Skip("GetGroupByKey is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -991,7 +981,6 @@ func TestQdrantStore_GetGroupByKey_Found(t *testing.T) {
 
 // TestQdrantStore_GetGroupByKey_NotFound は存在しないキー取得をテスト
 func TestQdrantStore_GetGroupByKey_NotFound(t *testing.T) {
-	t.Skip("GetGroupByKey is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -1005,7 +994,6 @@ func TestQdrantStore_GetGroupByKey_NotFound(t *testing.T) {
 
 // TestQdrantStore_UpdateGroup_Basic はグループ更新をテスト
 func TestQdrantStore_UpdateGroup_Basic(t *testing.T) {
-	t.Skip("UpdateGroup is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -1043,7 +1031,6 @@ func TestQdrantStore_UpdateGroup_Basic(t *testing.T) {
 
 // TestQdrantStore_UpdateGroup_NotFound は存在しないグループ更新をテスト
 func TestQdrantStore_UpdateGroup_NotFound(t *testing.T) {
-	t.Skip("UpdateGroup is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -1067,7 +1054,6 @@ func TestQdrantStore_UpdateGroup_NotFound(t *testing.T) {
 
 // TestQdrantStore_DeleteGroup_Success はグループ削除をテスト
 func TestQdrantStore_DeleteGroup_Success(t *testing.T) {
-	t.Skip("DeleteGroup is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -1097,7 +1083,6 @@ func TestQdrantStore_DeleteGroup_Success(t *testing.T) {
 
 // TestQdrantStore_DeleteGroup_NotFound は存在しないグループ削除をテスト
 func TestQdrantStore_DeleteGroup_NotFound(t *testing.T) {
-	t.Skip("DeleteGroup is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
@@ -1111,7 +1096,6 @@ func TestQdrantStore_DeleteGroup_NotFound(t *testing.T) {
 
 // TestQdrantStore_ListGroups_Basic はプロジェクト内グループ一覧をテスト
 func TestQdrantStore_ListGroups_Basic(t *testing.T) {
-	t.Skip("ListGroups is not implemented yet")
 
 	store := setupInitializedQdrantStore(t)
 	defer store.Close()
