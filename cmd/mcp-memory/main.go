@@ -179,7 +179,7 @@ func runServe(ctx context.Context, opts *Options) error {
 	defer cleanup()
 
 	// JSON-RPC Handler初期化
-	handler := jsonrpc.New(services.NoteService, services.ConfigService, services.GlobalService)
+	handler := jsonrpc.New(services.NoteService, services.ConfigService, services.GlobalService, services.GroupService)
 
 	// transport起動
 	switch opts.Transport {

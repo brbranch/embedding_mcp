@@ -379,6 +379,30 @@ exit 0
 
 **注意**: キーは必ず `global.` プレフィックスで始める必要があります。
 
+## Group機能
+
+グループを使ってノートを体系的に整理できます。グループはノートのカテゴリとして機能し、プロジェクト内で独自のグループを定義できます。
+
+### 予約済みグループ
+
+- `global`: システムで予約されており、ユーザーが作成することはできません。全体方針やコーディング規約など、プロジェクト全体に関わるノートに使用します。
+
+### グループキーの制約
+
+- 英数字、ハイフン(`-`)、アンダースコア(`_`)のみ使用可能
+- `global` は予約語のため使用不可
+- プロジェクト内で一意である必要あり
+
+### 使用例
+
+```bash
+# グループ作成
+echo '{"jsonrpc":"2.0","id":1,"method":"memory.group_create","params":{"projectId":"/path/to/project","groupKey":"feature-auth","title":"認証機能","description":"認証関連の仕様・議論"}}' | ./mcp-memory serve
+
+# グループ一覧
+echo '{"jsonrpc":"2.0","id":1,"method":"memory.group_list","params":{"projectId":"/path/to/project"}}' | ./mcp-memory serve
+```
+
 ## 対応メソッド一覧
 
 | メソッド | 説明 |
@@ -393,6 +417,11 @@ exit 0
 | `memory.set_config` | 設定変更 |
 | `memory.upsert_global` | グローバル設定upsert |
 | `memory.get_global` | グローバル設定取得 |
+| `memory.group_create` | グループ作成 |
+| `memory.group_get` | グループ取得 |
+| `memory.group_update` | グループ更新（groupKeyは変更不可） |
+| `memory.group_delete` | グループ削除 |
+| `memory.group_list` | プロジェクト内のグループ一覧 |
 
 ## エラーコードとトラブルシューティング
 

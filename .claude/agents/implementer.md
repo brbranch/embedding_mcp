@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: TDD に基づくテスト作成と本実装を担当。実装計画に従ってテストコードを作成し、テストが通る実装を行う。
+description: TDD に基づくテスト作成と本実装を担当。コードを書く・実装する・テストを書く・機能を追加するタスクでは、このエージェントを使用すること。
 model: sonnet
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---

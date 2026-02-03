@@ -29,18 +29,32 @@ type GlobalService interface {
 	DeleteByID(ctx context.Context, id string) error
 }
 
+// GroupService はグループのCRUDを提供
+type GroupService interface {
+	CreateGroup(ctx context.Context, req *CreateGroupRequest) (*CreateGroupResponse, error)
+	GetGroup(ctx context.Context, id string) (*GetGroupResponse, error)
+	UpdateGroup(ctx context.Context, req *UpdateGroupRequest) error
+	DeleteGroup(ctx context.Context, id string) error
+	ListGroups(ctx context.Context, projectID string) (*ListGroupsResponse, error)
+}
+
 // エラー定義
 var (
 	ErrNoteNotFound         = errors.New("note not found")
 	ErrGlobalConfigNotFound = errors.New("global config not found")
+	ErrGroupNotFound        = errors.New("group not found")
 	ErrInvalidGlobalKey     = errors.New("key must start with 'global.'")
-	ErrProjectIDRequired = errors.New("projectId is required")
-	ErrGroupIDRequired   = errors.New("groupId is required")
-	ErrInvalidGroupID    = errors.New("groupId contains invalid characters")
-	ErrTextRequired      = errors.New("text is required")
-	ErrQueryRequired     = errors.New("query is required")
-	ErrIDRequired        = errors.New("id is required")
-	ErrInvalidTimeFormat = errors.New("invalid time format (expected ISO8601 UTC)")
+	ErrProjectIDRequired    = errors.New("projectId is required")
+	ErrGroupIDRequired      = errors.New("groupId is required")
+	ErrGroupKeyRequired     = errors.New("groupKey is required")
+	ErrTitleRequired        = errors.New("title is required")
+	ErrInvalidGroupID       = errors.New("groupId contains invalid characters")
+	ErrInvalidGroupKey      = errors.New("groupKey contains invalid characters or is reserved")
+	ErrGroupKeyExists       = errors.New("groupKey already exists in this project")
+	ErrTextRequired         = errors.New("text is required")
+	ErrQueryRequired        = errors.New("query is required")
+	ErrIDRequired           = errors.New("id is required")
+	ErrInvalidTimeFormat    = errors.New("invalid time format (expected ISO8601 UTC)")
 )
 
 // groupIDRegex はgroupIdの文字制約を検証

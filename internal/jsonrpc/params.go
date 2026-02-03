@@ -220,3 +220,59 @@ type GetGlobalParams struct {
 type DeleteParams struct {
 	ID string `json:"id"`
 }
+
+// GroupCreateParams は memory.group_create のパラメータ
+type GroupCreateParams struct {
+	ProjectID   string `json:"projectId"`
+	GroupKey    string `json:"groupKey"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+// ToRequest はサービスリクエストに変換
+func (p *GroupCreateParams) ToRequest() *service.CreateGroupRequest {
+	return &service.CreateGroupRequest{
+		ProjectID:   p.ProjectID,
+		GroupKey:    p.GroupKey,
+		Title:       p.Title,
+		Description: p.Description,
+	}
+}
+
+// GroupGetParams は memory.group_get のパラメータ
+type GroupGetParams struct {
+	ID string `json:"id"`
+}
+
+// GroupUpdateParams は memory.group_update のパラメータ
+type GroupUpdateParams struct {
+	ID    string          `json:"id"`
+	Patch GroupPatchParam `json:"patch"`
+}
+
+// GroupPatchParam はグループ更新のパッチパラメータ
+type GroupPatchParam struct {
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// ToRequest はサービスリクエストに変換
+func (p *GroupUpdateParams) ToRequest() *service.UpdateGroupRequest {
+	return &service.UpdateGroupRequest{
+		ID: p.ID,
+		Patch: service.GroupPatch{
+			Title:       p.Patch.Title,
+			Description: p.Patch.Description,
+		},
+	}
+}
+
+// GroupDeleteParams は memory.group_delete のパラメータ
+type GroupDeleteParams struct {
+	ID string `json:"id"`
+}
+
+// GroupListParams は memory.group_list のパラメータ
+type GroupListParams struct {
+	ProjectID string `json:"projectId"`
+}

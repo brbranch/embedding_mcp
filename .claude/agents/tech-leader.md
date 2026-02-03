@@ -1,6 +1,6 @@
 ---
 name: tech-leader
-description: エスカレーション対応と問題の調査・方針決定を担当。テスト失敗や設計変更が必要な場合に呼び出される。
+description: エスカレーション対応と問題の調査・方針決定を担当。テストが失敗した・実装が行き詰まった・設計変更が必要な場合に使用すること。
 model: opus
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---

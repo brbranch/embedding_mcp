@@ -160,3 +160,58 @@ type GetGlobalResponse struct {
 	Value     any
 	UpdatedAt *string
 }
+
+// CreateGroupRequest はグループ作成リクエスト
+type CreateGroupRequest struct {
+	ProjectID   string
+	GroupKey    string
+	Title       string
+	Description string
+}
+
+// CreateGroupResponse はグループ作成レスポンス
+type CreateGroupResponse struct {
+	ID        string
+	Namespace string
+}
+
+// GetGroupResponse はグループ取得レスポンス
+type GetGroupResponse struct {
+	ID          string
+	ProjectID   string
+	GroupKey    string
+	Title       string
+	Description string
+	CreatedAt   string
+	UpdatedAt   string
+	Namespace   string
+}
+
+// UpdateGroupRequest はグループ更新リクエスト
+type UpdateGroupRequest struct {
+	ID    string
+	Patch GroupPatch
+}
+
+// GroupPatch はグループ更新パッチ
+type GroupPatch struct {
+	Title       *string // nilは変更なし
+	Description *string // nilは変更なし
+}
+
+// ListGroupsResponse はグループ一覧レスポンス
+type ListGroupsResponse struct {
+	Namespace string
+	Groups    []ListGroupItem
+}
+
+// ListGroupItem はグループ一覧の1件
+type ListGroupItem struct {
+	ID          string
+	ProjectID   string
+	GroupKey    string
+	Title       string
+	Description string
+	CreatedAt   string
+	UpdatedAt   string
+}

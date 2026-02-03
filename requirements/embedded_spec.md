@@ -294,7 +294,80 @@ Output:
 - 物理削除を実行
 - 検索順序: Note → GlobalConfig（Noteを優先）
 - Note/GlobalConfig共にUUID v4形式（衝突なし）
-- 指定IDが存在しない場合は Not found エラー (-32001)
+- 指定IDが存在しない場合は Not found エラー (-32003)
+
+## Group 管理 API
+
+Groupは、プロジェクト内でノートを分類するためのエンティティです。
+groupId="global" は予約値であり、Group テーブルには登録できません。
+
+11) memory.group_create
+Input:
+{
+  "projectId": string,
+  "groupKey": string,        // "global" は禁止、英数字と -_ のみ
+  "title": string,
+  "description": string|null
+}
+Output:
+{ "id": string, "namespace": string }
+
+- groupKey はプロジェクト内で一意
+- "global" は予約値のため登録不可（エラー: -32602）
+- 重複 groupKey はエラー（-32005 Conflict）
+
+12) memory.group_get
+Input:
+{ "id": string }
+Output:
+{
+  "id": string,
+  "projectId": string,
+  "groupKey": string,
+  "title": string,
+  "description": string,
+  "createdAt": string,
+  "updatedAt": string,
+  "namespace": string
+}
+
+13) memory.group_update
+Input:
+{
+  "id": string,
+  "patch": {
+    "title"?: string,
+    "description"?: string
+  }
+}
+Output: { "ok": true }
+
+- groupKey は変更不可（一意性キーのため）
+
+14) memory.group_delete
+Input:
+{ "id": string }
+Output:
+{ "ok": true }
+
+15) memory.group_list
+Input:
+{ "projectId": string }
+Output:
+{
+  "namespace": string,
+  "groups": [
+    {
+      "id": string,
+      "projectId": string,
+      "groupKey": string,
+      "title": string,
+      "description": string,
+      "createdAt": string,
+      "updatedAt": string
+    }
+  ]
+}
 
 # 9. 設定ファイル & データ保存
 - 設定ファイルはローカルに保存する（例: ~/.local-mcp-memory/config.json）。

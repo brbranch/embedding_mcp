@@ -92,3 +92,33 @@ func (s *ChromaStore) GetGlobalByID(ctx context.Context, id string) (*model.Glob
 func (s *ChromaStore) DeleteGlobalByID(ctx context.Context, id string) error {
 	return fmt.Errorf("ChromaStore is not yet implemented")
 }
+
+// AddGroup はグループを追加する
+func (s *ChromaStore) AddGroup(ctx context.Context, group *model.Group) error {
+	return fmt.Errorf("ChromaStore is not yet implemented")
+}
+
+// GetGroup はIDでグループを取得する
+func (s *ChromaStore) GetGroup(ctx context.Context, id string) (*model.Group, error) {
+	return nil, fmt.Errorf("ChromaStore is not yet implemented")
+}
+
+// GetGroupByKey はProjectIDとGroupKeyでグループを取得する
+func (s *ChromaStore) GetGroupByKey(ctx context.Context, projectID, groupKey string) (*model.Group, error) {
+	return nil, fmt.Errorf("ChromaStore is not yet implemented")
+}
+
+// UpdateGroup はグループを更新する
+func (s *ChromaStore) UpdateGroup(ctx context.Context, group *model.Group) error {
+	return fmt.Errorf("ChromaStore is not yet implemented")
+}
+
+// DeleteGroup はグループを削除する
+func (s *ChromaStore) DeleteGroup(ctx context.Context, id string) error {
+	return fmt.Errorf("ChromaStore is not yet implemented")
+}
+
+// ListGroups はプロジェクト内の全グループを取得する
+func (s *ChromaStore) ListGroups(ctx context.Context, projectID string) ([]*model.Group, error) {
+	return nil, fmt.Errorf("ChromaStore is not yet implemented")
+}

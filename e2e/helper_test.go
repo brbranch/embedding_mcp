@@ -96,10 +96,11 @@ func setupTestHandler(t *testing.T) *jsonrpc.Handler {
 	// 3. Services作成
 	noteService := service.NewNoteService(emb, st, namespace)
 	globalService := service.NewGlobalService(st, namespace)
+	groupService := service.NewGroupService(st, namespace)
 	configService := &mockConfigService{}
 
 	// 4. Handler作成
-	return jsonrpc.New(noteService, configService, globalService)
+	return jsonrpc.New(noteService, configService, globalService, groupService)
 }
 
 // callAddNote はmemory.add_noteを呼び出す
@@ -366,6 +367,300 @@ type GetGlobalResult struct {
 	ID        *string `json:"id"`
 	Value     any     `json:"value"`
 	UpdatedAt *string `json:"updatedAt"`
+}
+
+// callGroupCreate はmemory.group_createを呼び出す
+func callGroupCreate(t *testing.T, h *jsonrpc.Handler, projectID, groupKey, title, description string) *GroupCreateResult {
+	t.Helper()
+
+	reqBytes, err := json.Marshal(model.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "memory.group_create",
+		Params: map[string]any{
+			"projectId":   projectID,
+			"groupKey":    groupKey,
+			"title":       title,
+			"description": description,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	respBytes := h.Handle(context.Background(), reqBytes)
+
+	// エラーチェック用に一旦RawResponseにUnmarshal
+	var rawResp RawResponse
+	if err := json.Unmarshal(respBytes, &rawResp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if rawResp.Error != nil {
+		t.Fatalf("group_create failed: %v", rawResp.Error)
+	}
+
+	result := &GroupCreateResult{}
+	resultBytes, _ := json.Marshal(rawResp.Result)
+	if err := json.Unmarshal(resultBytes, result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	return result
+}
+
+// callGroupCreateRaw はmemory.group_createを呼び出して生のレスポンスを返す
+func callGroupCreateRaw(t *testing.T, h *jsonrpc.Handler, projectID, groupKey, title, description string) *RawResponse {
+	t.Helper()
+
+	reqBytes, err := json.Marshal(model.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "memory.group_create",
+		Params: map[string]any{
+			"projectId":   projectID,
+			"groupKey":    groupKey,
+			"title":       title,
+			"description": description,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	respBytes := h.Handle(context.Background(), reqBytes)
+
+	var resp RawResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	return &resp
+}
+
+// callGroupGet はmemory.group_getを呼び出す
+func callGroupGet(t *testing.T, h *jsonrpc.Handler, id string) *GroupGetResult {
+	t.Helper()
+
+	reqBytes, err := json.Marshal(model.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "memory.group_get",
+		Params: map[string]any{
+			"id": id,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	respBytes := h.Handle(context.Background(), reqBytes)
+
+	// エラーチェック用に一旦RawResponseにUnmarshal
+	var rawResp RawResponse
+	if err := json.Unmarshal(respBytes, &rawResp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if rawResp.Error != nil {
+		t.Fatalf("group_get failed: %v", rawResp.Error)
+	}
+
+	result := &GroupGetResult{}
+	resultBytes, _ := json.Marshal(rawResp.Result)
+	if err := json.Unmarshal(resultBytes, result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	return result
+}
+
+// callGroupGetRaw はmemory.group_getを呼び出して生のレスポンスを返す
+func callGroupGetRaw(t *testing.T, h *jsonrpc.Handler, id string) *RawResponse {
+	t.Helper()
+
+	reqBytes, err := json.Marshal(model.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "memory.group_get",
+		Params: map[string]any{
+			"id": id,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	respBytes := h.Handle(context.Background(), reqBytes)
+
+	var resp RawResponse
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	return &resp
+}
+
+// callGroupUpdate はmemory.group_updateを呼び出す
+func callGroupUpdate(t *testing.T, h *jsonrpc.Handler, id string, title, description *string) *GroupUpdateResult {
+	t.Helper()
+
+	params := map[string]any{
+		"id": id,
+	}
+	patchFields := map[string]any{}
+	if title != nil {
+		patchFields["title"] = *title
+	}
+	if description != nil {
+		patchFields["description"] = *description
+	}
+	if len(patchFields) > 0 {
+		params["patch"] = patchFields
+	}
+
+	reqBytes, err := json.Marshal(model.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "memory.group_update",
+		Params:  params,
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	respBytes := h.Handle(context.Background(), reqBytes)
+
+	// エラーチェック用に一旦RawResponseにUnmarshal
+	var rawResp RawResponse
+	if err := json.Unmarshal(respBytes, &rawResp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if rawResp.Error != nil {
+		t.Fatalf("group_update failed: %v", rawResp.Error)
+	}
+
+	result := &GroupUpdateResult{}
+	resultBytes, _ := json.Marshal(rawResp.Result)
+	if err := json.Unmarshal(resultBytes, result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	return result
+}
+
+// callGroupDelete はmemory.group_deleteを呼び出す
+func callGroupDelete(t *testing.T, h *jsonrpc.Handler, id string) *GroupDeleteResult {
+	t.Helper()
+
+	reqBytes, err := json.Marshal(model.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "memory.group_delete",
+		Params: map[string]any{
+			"id": id,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	respBytes := h.Handle(context.Background(), reqBytes)
+
+	// エラーチェック用に一旦RawResponseにUnmarshal
+	var rawResp RawResponse
+	if err := json.Unmarshal(respBytes, &rawResp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if rawResp.Error != nil {
+		t.Fatalf("group_delete failed: %v", rawResp.Error)
+	}
+
+	result := &GroupDeleteResult{}
+	resultBytes, _ := json.Marshal(rawResp.Result)
+	if err := json.Unmarshal(resultBytes, result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	return result
+}
+
+// callGroupList はmemory.group_listを呼び出す
+func callGroupList(t *testing.T, h *jsonrpc.Handler, projectID string) *GroupListResult {
+	t.Helper()
+
+	reqBytes, err := json.Marshal(model.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "memory.group_list",
+		Params: map[string]any{
+			"projectId": projectID,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal request: %v", err)
+	}
+
+	respBytes := h.Handle(context.Background(), reqBytes)
+
+	// エラーチェック用に一旦RawResponseにUnmarshal
+	var rawResp RawResponse
+	if err := json.Unmarshal(respBytes, &rawResp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if rawResp.Error != nil {
+		t.Fatalf("group_list failed: %v", rawResp.Error)
+	}
+
+	result := &GroupListResult{}
+	resultBytes, _ := json.Marshal(rawResp.Result)
+	if err := json.Unmarshal(resultBytes, result); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	return result
+}
+
+type GroupCreateResult struct {
+	ID        string `json:"id"`
+	Namespace string `json:"namespace"`
+}
+
+type GroupGetResult struct {
+	ID          string `json:"id"`
+	ProjectID   string `json:"projectId"`
+	GroupKey    string `json:"groupKey"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+	Namespace   string `json:"namespace"`
+}
+
+type GroupUpdateResult struct {
+	OK bool `json:"ok"`
+}
+
+type GroupDeleteResult struct {
+	OK bool `json:"ok"`
+}
+
+type GroupListResult struct {
+	Namespace string          `json:"namespace"`
+	Groups    []GroupListItem `json:"groups"`
+}
+
+type GroupListItem struct {
+	ID          string `json:"id"`
+	ProjectID   string `json:"projectId"`
+	GroupKey    string `json:"groupKey"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
 }
 
 type RawResponse struct {
