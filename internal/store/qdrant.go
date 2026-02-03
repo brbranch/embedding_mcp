@@ -6,10 +6,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/brbranch/embedding_mcp/internal/model"
@@ -43,6 +45,7 @@ type QdrantStore struct {
 	url         string
 	namespace   string
 	initialized bool
+	mu          sync.RWMutex // initializedフラグの保護
 }
 
 // NewQdrantStore はQdrantStoreを作成する
@@ -158,23 +161,34 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 		}
 	}
 
+	s.mu.Lock()
 	s.namespace = namespace
 	s.initialized = true
+	s.mu.Unlock()
 	return nil
 }
 
 // Close はストアをクローズする
 func (s *QdrantStore) Close() error {
+	s.mu.Lock()
 	s.initialized = false
+	s.mu.Unlock()
 	if s.client != nil {
 		s.client.Close()
 	}
 	return nil
 }
 
+// isInitialized は初期化状態を安全に取得する
+func (s *QdrantStore) isInitialized() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.initialized
+}
+
 // AddNote はノートを追加する
 func (s *QdrantStore) AddNote(ctx context.Context, note *model.Note, embedding []float32) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -214,7 +228,7 @@ func (s *QdrantStore) AddNote(ctx context.Context, note *model.Note, embedding [
 
 // Get はIDでノートを取得する
 func (s *QdrantStore) Get(ctx context.Context, id string) (*model.Note, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, ErrNotInitialized
 	}
 
@@ -244,7 +258,7 @@ func (s *QdrantStore) Get(ctx context.Context, id string) (*model.Note, error) {
 
 // Update はノートを更新する
 func (s *QdrantStore) Update(ctx context.Context, note *model.Note, embedding []float32) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -292,7 +306,7 @@ func (s *QdrantStore) Update(ctx context.Context, note *model.Note, embedding []
 
 // Delete はノートを削除する
 func (s *QdrantStore) Delete(ctx context.Context, id string) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -326,7 +340,7 @@ func (s *QdrantStore) Delete(ctx context.Context, id string) error {
 
 // Search はベクトル検索を実行する
 func (s *QdrantStore) Search(ctx context.Context, embedding []float32, opts SearchOptions) ([]SearchResult, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, ErrNotInitialized
 	}
 
@@ -373,7 +387,7 @@ func (s *QdrantStore) Search(ctx context.Context, embedding []float32, opts Sear
 
 // ListRecent は最新のノートをリストする
 func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*model.Note, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, ErrNotInitialized
 	}
 
@@ -404,12 +418,24 @@ func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 	}
 
 	// createdAt降順でソート
+	// パースエラーの場合はzero timeとして末尾にソート
 	sort.Slice(notes, func(i, j int) bool {
-		if notes[i].CreatedAt == nil || notes[j].CreatedAt == nil {
-			return false
+		if notes[i].CreatedAt == nil {
+			return false // nilは末尾
 		}
-		ti, _ := time.Parse(time.RFC3339, *notes[i].CreatedAt)
-		tj, _ := time.Parse(time.RFC3339, *notes[j].CreatedAt)
+		if notes[j].CreatedAt == nil {
+			return true // nilは末尾
+		}
+		ti, erri := time.Parse(time.RFC3339, *notes[i].CreatedAt)
+		tj, errj := time.Parse(time.RFC3339, *notes[j].CreatedAt)
+		if erri != nil {
+			log.Printf("warning: failed to parse createdAt for note %s: %v", notes[i].ID, erri)
+			return false // パースエラーは末尾
+		}
+		if errj != nil {
+			log.Printf("warning: failed to parse createdAt for note %s: %v", notes[j].ID, errj)
+			return true // パースエラーは末尾
+		}
 		return ti.After(tj)
 	})
 
@@ -585,9 +611,14 @@ func payloadToNote(payload map[string]*qdrant.Value) (*model.Note, error) {
 		if structVal != nil && structVal.Fields != nil {
 			// structValueをJSONに変換してから戻す
 			jsonBytes, err := json.Marshal(structVal.Fields)
-			if err == nil {
-				json.Unmarshal(jsonBytes, &metadata)
-				note.Metadata = metadata
+			if err != nil {
+				log.Printf("warning: failed to marshal metadata: %v", err)
+			} else {
+				if err := json.Unmarshal(jsonBytes, &metadata); err != nil {
+					log.Printf("warning: failed to unmarshal metadata: %v", err)
+				} else {
+					note.Metadata = metadata
+				}
 			}
 		}
 	}
@@ -597,9 +628,15 @@ func payloadToNote(payload map[string]*qdrant.Value) (*model.Note, error) {
 
 // GlobalConfig操作
 
+// globalConfigID はprojectIDとkeyから決定論的なIDを生成する
+// これにより同一projectID+keyの競合を防ぐ
+func globalConfigID(projectID, key string) string {
+	return fmt.Sprintf("global:%s:%s", projectID, key)
+}
+
 // UpsertGlobal はGlobalConfigの新規作成または更新を行う
 func (s *QdrantStore) UpsertGlobal(ctx context.Context, config *model.GlobalConfig) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -609,16 +646,9 @@ func (s *QdrantStore) UpsertGlobal(ctx context.Context, config *model.GlobalConf
 		config.UpdatedAt = &now
 	}
 
-	// 既存のconfigを検索（projectID + key）
-	existingConfig, found, err := s.GetGlobal(ctx, config.ProjectID, config.Key)
-	if err != nil {
-		return err
-	}
-
-	// 既存があればそのIDを使用
-	if found {
-		config.ID = existingConfig.ID
-	}
+	// projectID + keyから決定論的なIDを生成（競合を防ぐ）
+	// クライアントが指定したIDは無視し、常にprojectID+keyからIDを導出する
+	config.ID = globalConfigID(config.ProjectID, config.Key)
 
 	// payloadを構築
 	payload := make(map[string]*qdrant.Value)
@@ -664,7 +694,7 @@ func (s *QdrantStore) UpsertGlobal(ctx context.Context, config *model.GlobalConf
 
 // GetGlobal はProjectIDとKeyでGlobalConfigを取得する
 func (s *QdrantStore) GetGlobal(ctx context.Context, projectID, key string) (*model.GlobalConfig, bool, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, false, ErrNotInitialized
 	}
 
@@ -704,7 +734,7 @@ func (s *QdrantStore) GetGlobal(ctx context.Context, projectID, key string) (*mo
 
 // GetGlobalByID はIDでGlobalConfigを取得する
 func (s *QdrantStore) GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, ErrNotInitialized
 	}
 
@@ -734,7 +764,7 @@ func (s *QdrantStore) GetGlobalByID(ctx context.Context, id string) (*model.Glob
 
 // DeleteGlobalByID はIDでGlobalConfigを削除する
 func (s *QdrantStore) DeleteGlobalByID(ctx context.Context, id string) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -770,7 +800,7 @@ func (s *QdrantStore) DeleteGlobalByID(ctx context.Context, id string) error {
 
 // AddGroup はグループを追加する
 func (s *QdrantStore) AddGroup(ctx context.Context, group *model.Group) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -810,7 +840,7 @@ func (s *QdrantStore) AddGroup(ctx context.Context, group *model.Group) error {
 
 // GetGroup はIDでグループを取得する
 func (s *QdrantStore) GetGroup(ctx context.Context, id string) (*model.Group, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, ErrNotInitialized
 	}
 
@@ -840,7 +870,7 @@ func (s *QdrantStore) GetGroup(ctx context.Context, id string) (*model.Group, er
 
 // GetGroupByKey はProjectIDとGroupKeyでグループを取得する
 func (s *QdrantStore) GetGroupByKey(ctx context.Context, projectID, groupKey string) (*model.Group, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, ErrNotInitialized
 	}
 
@@ -880,7 +910,7 @@ func (s *QdrantStore) GetGroupByKey(ctx context.Context, projectID, groupKey str
 
 // UpdateGroup はグループを更新する
 func (s *QdrantStore) UpdateGroup(ctx context.Context, group *model.Group) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -935,7 +965,7 @@ func (s *QdrantStore) UpdateGroup(ctx context.Context, group *model.Group) error
 
 // DeleteGroup はグループを削除する
 func (s *QdrantStore) DeleteGroup(ctx context.Context, id string) error {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return ErrNotInitialized
 	}
 
@@ -969,7 +999,7 @@ func (s *QdrantStore) DeleteGroup(ctx context.Context, id string) error {
 
 // ListGroups はプロジェクト内のグループ一覧を取得する
 func (s *QdrantStore) ListGroups(ctx context.Context, projectID string) ([]*model.Group, error) {
-	if !s.initialized {
+	if !s.isInitialized() {
 		return nil, ErrNotInitialized
 	}
 

@@ -797,7 +797,6 @@ func TestQdrantStore_GetGlobalByID_Found(t *testing.T) {
 	ctx := context.Background()
 	updatedAt := "2024-01-01T00:00:00Z"
 	config := &model.GlobalConfig{
-		ID:        "global-byid-test",
 		ProjectID: testQdrantProjectID,
 		Key:       "global.byid.key",
 		Value:     "test-value",
@@ -808,7 +807,8 @@ func TestQdrantStore_GetGlobalByID_Found(t *testing.T) {
 		t.Fatalf("UpsertGlobal failed: %v", err)
 	}
 
-	retrieved, err := store.GetGlobalByID(ctx, "global-byid-test")
+	// UpsertGlobal後にconfig.IDが設定される（projectID+keyから生成）
+	retrieved, err := store.GetGlobalByID(ctx, config.ID)
 	if err != nil {
 		t.Fatalf("GetGlobalByID failed: %v", err)
 	}
@@ -839,7 +839,6 @@ func TestQdrantStore_DeleteGlobalByID_Success(t *testing.T) {
 	ctx := context.Background()
 	updatedAt := "2024-01-01T00:00:00Z"
 	config := &model.GlobalConfig{
-		ID:        "global-delete-test",
 		ProjectID: testQdrantProjectID,
 		Key:       "global.delete.key",
 		Value:     "to-be-deleted",
@@ -850,12 +849,13 @@ func TestQdrantStore_DeleteGlobalByID_Success(t *testing.T) {
 		t.Fatalf("UpsertGlobal failed: %v", err)
 	}
 
-	if err := store.DeleteGlobalByID(ctx, "global-delete-test"); err != nil {
+	// UpsertGlobal後にconfig.IDが設定される
+	if err := store.DeleteGlobalByID(ctx, config.ID); err != nil {
 		t.Fatalf("DeleteGlobalByID failed: %v", err)
 	}
 
 	// 削除後は取得できない
-	_, err := store.GetGlobalByID(ctx, "global-delete-test")
+	_, err := store.GetGlobalByID(ctx, config.ID)
 	if err != ErrNotFound {
 		t.Errorf("Expected ErrNotFound after delete, got %v", err)
 	}
