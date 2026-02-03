@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"sort"
 	"strconv"
@@ -394,6 +395,7 @@ func (s *QdrantStore) Search(ctx context.Context, embedding []float32, opts Sear
 	for _, point := range queryResp {
 		note, err := payloadToNote(point.Payload)
 		if err != nil {
+			log.Printf("warning: failed to convert payload to note in Search: %v", err)
 			continue
 		}
 
@@ -446,6 +448,7 @@ func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 	for _, point := range scrollResp {
 		note, err := payloadToNote(point.Payload)
 		if err != nil {
+			log.Printf("warning: failed to convert payload to note in ListRecent: %v", err)
 			continue
 		}
 		notes = append(notes, note)
@@ -1007,26 +1010,46 @@ func (s *QdrantStore) ListGroups(ctx context.Context, projectID string) ([]*mode
 		},
 	}
 
-	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
-		CollectionName: s.groupCollection(),
-		Filter:         filter,
-		Limit:          qdrant.PtrOf(uint32(1000)), // 十分大きな値
-		WithPayload:    qdrant.NewWithPayload(true),
-		WithVectors:    qdrant.NewWithVectors(false),
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to scroll groups: %w", err)
-	}
-
-	// payloadからGroupに変換
+	// ページングを使用して全件取得
 	var groups []*model.Group
-	for _, point := range scrollResp {
-		group, err := payloadToGroup(point.Payload)
+	var offset *qdrant.PointId
+	const pageSize = uint32(1000)
+
+	for {
+		scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
+			CollectionName: s.groupCollection(),
+			Filter:         filter,
+			Limit:          qdrant.PtrOf(pageSize),
+			WithPayload:    qdrant.NewWithPayload(true),
+			WithVectors:    qdrant.NewWithVectors(false),
+			Offset:         offset,
+		})
+
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("failed to scroll groups: %w", err)
 		}
-		groups = append(groups, group)
+
+		// payloadからGroupに変換
+		for _, point := range scrollResp {
+			group, err := payloadToGroup(point.Payload)
+			if err != nil {
+				log.Printf("warning: failed to convert payload to group in ListGroups: %v", err)
+				continue
+			}
+			groups = append(groups, group)
+		}
+
+		// 次のページがなければ終了
+		if len(scrollResp) < int(pageSize) {
+			break
+		}
+
+		// 最後のポイントのIDを次のオフセットとして使用
+		if len(scrollResp) > 0 {
+			offset = scrollResp[len(scrollResp)-1].Id
+		} else {
+			break
+		}
 	}
 
 	return groups, nil
