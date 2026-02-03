@@ -530,3 +530,57 @@ func payloadToNote(payload map[string]*qdrant.Value) (*model.Note, error) {
 
 	return note, nil
 }
+
+// GlobalConfig操作（スタブ）
+
+// UpsertGlobal はGlobalConfigの新規作成または更新を行う（未実装）
+func (s *QdrantStore) UpsertGlobal(ctx context.Context, config *model.GlobalConfig) error {
+	return fmt.Errorf("UpsertGlobal is not implemented yet")
+}
+
+// GetGlobal はProjectIDとKeyでGlobalConfigを取得する（未実装）
+func (s *QdrantStore) GetGlobal(ctx context.Context, projectID, key string) (*model.GlobalConfig, bool, error) {
+	return nil, false, fmt.Errorf("GetGlobal is not implemented yet")
+}
+
+// GetGlobalByID はIDでGlobalConfigを取得する（未実装）
+func (s *QdrantStore) GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error) {
+	return nil, fmt.Errorf("GetGlobalByID is not implemented yet")
+}
+
+// DeleteGlobalByID はIDでGlobalConfigを削除する（未実装）
+func (s *QdrantStore) DeleteGlobalByID(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteGlobalByID is not implemented yet")
+}
+
+// Group操作（スタブ）
+
+// AddGroup はグループを追加する（未実装）
+func (s *QdrantStore) AddGroup(ctx context.Context, group *model.Group) error {
+	return fmt.Errorf("AddGroup is not implemented yet")
+}
+
+// GetGroup はIDでグループを取得する（未実装）
+func (s *QdrantStore) GetGroup(ctx context.Context, id string) (*model.Group, error) {
+	return nil, fmt.Errorf("GetGroup is not implemented yet")
+}
+
+// GetGroupByKey はProjectIDとGroupKeyでグループを取得する（未実装）
+func (s *QdrantStore) GetGroupByKey(ctx context.Context, projectID, groupKey string) (*model.Group, error) {
+	return nil, fmt.Errorf("GetGroupByKey is not implemented yet")
+}
+
+// UpdateGroup はグループを更新する（未実装）
+func (s *QdrantStore) UpdateGroup(ctx context.Context, group *model.Group) error {
+	return fmt.Errorf("UpdateGroup is not implemented yet")
+}
+
+// DeleteGroup はグループを削除する（未実装）
+func (s *QdrantStore) DeleteGroup(ctx context.Context, id string) error {
+	return fmt.Errorf("DeleteGroup is not implemented yet")
+}
+
+// ListGroups はプロジェクト内のグループ一覧を取得する（未実装）
+func (s *QdrantStore) ListGroups(ctx context.Context, projectID string) ([]*model.Group, error) {
+	return nil, fmt.Errorf("ListGroups is not implemented yet")
+}

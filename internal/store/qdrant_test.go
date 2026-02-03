@@ -675,3 +675,485 @@ func TestQdrantStore_ListRecent_WithTagsFilter(t *testing.T) {
 		t.Errorf("Expected note 'list-tag-1', got '%s'", notes[0].ID)
 	}
 }
+
+// TestQdrantStore_UpsertGlobal_Insert は新規global config作成をテスト
+func TestQdrantStore_UpsertGlobal_Insert(t *testing.T) {
+	t.Skip("UpsertGlobal is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	updatedAt := "2024-01-15T10:30:00Z"
+	config := &model.GlobalConfig{
+		ID:        "config-1",
+		ProjectID: testQdrantProjectID,
+		Key:       "global.test.key",
+		Value:     "test-value",
+		UpdatedAt: &updatedAt,
+	}
+
+	if err := store.UpsertGlobal(ctx, config); err != nil {
+		t.Fatalf("UpsertGlobal failed: %v", err)
+	}
+
+	retrieved, found, err := store.GetGlobal(ctx, testQdrantProjectID, "global.test.key")
+	if err != nil {
+		t.Fatalf("GetGlobal failed: %v", err)
+	}
+	if !found {
+		t.Fatal("Config should be found")
+	}
+	if retrieved.Value != "test-value" {
+		t.Errorf("Expected value 'test-value', got '%v'", retrieved.Value)
+	}
+}
+
+// TestQdrantStore_UpsertGlobal_Update はglobal config更新をテスト
+func TestQdrantStore_UpsertGlobal_Update(t *testing.T) {
+	t.Skip("UpsertGlobal is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	updatedAt := "2024-01-15T10:30:00Z"
+	config := &model.GlobalConfig{
+		ID:        "config-1",
+		ProjectID: testQdrantProjectID,
+		Key:       "global.test.key",
+		Value:     "original",
+		UpdatedAt: &updatedAt,
+	}
+
+	store.UpsertGlobal(ctx, config)
+
+	// 更新
+	config.Value = "updated"
+	updatedAt2 := "2024-01-16T10:30:00Z"
+	config.UpdatedAt = &updatedAt2
+	if err := store.UpsertGlobal(ctx, config); err != nil {
+		t.Fatalf("UpsertGlobal update failed: %v", err)
+	}
+
+	retrieved, _, _ := store.GetGlobal(ctx, testQdrantProjectID, "global.test.key")
+	if retrieved.Value != "updated" {
+		t.Errorf("Expected value 'updated', got '%v'", retrieved.Value)
+	}
+}
+
+// TestQdrantStore_GetGlobal_Found は存在するconfig取得をテスト
+func TestQdrantStore_GetGlobal_Found(t *testing.T) {
+	t.Skip("GetGlobal is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	updatedAt := "2024-01-15T10:30:00Z"
+	config := &model.GlobalConfig{
+		ID:        "config-1",
+		ProjectID: testQdrantProjectID,
+		Key:       "global.test.key",
+		Value:     map[string]any{"nested": "value"},
+		UpdatedAt: &updatedAt,
+	}
+
+	store.UpsertGlobal(ctx, config)
+
+	retrieved, found, err := store.GetGlobal(ctx, testQdrantProjectID, "global.test.key")
+	if err != nil {
+		t.Fatalf("GetGlobal failed: %v", err)
+	}
+	if !found {
+		t.Fatal("Config should be found")
+	}
+	if retrieved.Key != "global.test.key" {
+		t.Errorf("Expected key 'global.test.key', got '%s'", retrieved.Key)
+	}
+}
+
+// TestQdrantStore_GetGlobal_NotFound は存在しないconfig取得をテスト
+func TestQdrantStore_GetGlobal_NotFound(t *testing.T) {
+	t.Skip("GetGlobal is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	_, found, err := store.GetGlobal(ctx, testQdrantProjectID, "nonexistent")
+	if err != nil {
+		t.Fatalf("GetGlobal should not return error: %v", err)
+	}
+	if found {
+		t.Error("Config should not be found")
+	}
+}
+
+// TestQdrantStore_GetGlobalByID_Found はID指定でのconfig取得をテスト
+func TestQdrantStore_GetGlobalByID_Found(t *testing.T) {
+	t.Skip("GetGlobalByID is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	updatedAt := "2024-01-01T00:00:00Z"
+	config := &model.GlobalConfig{
+		ID:        "global-byid-test",
+		ProjectID: testQdrantProjectID,
+		Key:       "global.byid.key",
+		Value:     "test-value",
+		UpdatedAt: &updatedAt,
+	}
+
+	if err := store.UpsertGlobal(ctx, config); err != nil {
+		t.Fatalf("UpsertGlobal failed: %v", err)
+	}
+
+	retrieved, err := store.GetGlobalByID(ctx, "global-byid-test")
+	if err != nil {
+		t.Fatalf("GetGlobalByID failed: %v", err)
+	}
+	if retrieved.Key != "global.byid.key" {
+		t.Errorf("Expected key 'global.byid.key', got '%s'", retrieved.Key)
+	}
+}
+
+// TestQdrantStore_GetGlobalByID_NotFound は存在しないID取得をテスト
+func TestQdrantStore_GetGlobalByID_NotFound(t *testing.T) {
+	t.Skip("GetGlobalByID is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	_, err := store.GetGlobalByID(ctx, "nonexistent-id")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
+// TestQdrantStore_DeleteGlobalByID_Success はGlobalConfig削除をテスト
+func TestQdrantStore_DeleteGlobalByID_Success(t *testing.T) {
+	t.Skip("DeleteGlobalByID is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	updatedAt := "2024-01-01T00:00:00Z"
+	config := &model.GlobalConfig{
+		ID:        "global-delete-test",
+		ProjectID: testQdrantProjectID,
+		Key:       "global.delete.key",
+		Value:     "to-be-deleted",
+		UpdatedAt: &updatedAt,
+	}
+
+	if err := store.UpsertGlobal(ctx, config); err != nil {
+		t.Fatalf("UpsertGlobal failed: %v", err)
+	}
+
+	if err := store.DeleteGlobalByID(ctx, "global-delete-test"); err != nil {
+		t.Fatalf("DeleteGlobalByID failed: %v", err)
+	}
+
+	// 削除後は取得できない
+	_, err := store.GetGlobalByID(ctx, "global-delete-test")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+// TestQdrantStore_DeleteGlobalByID_NotFound は存在しないID削除をテスト
+func TestQdrantStore_DeleteGlobalByID_NotFound(t *testing.T) {
+	t.Skip("DeleteGlobalByID is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	err := store.DeleteGlobalByID(ctx, "nonexistent-id")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
+// TestQdrantStore_AddGroup_Basic はグループ追加をテスト
+func TestQdrantStore_AddGroup_Basic(t *testing.T) {
+	t.Skip("AddGroup is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	group := &model.Group{
+		ID:          "group-1",
+		ProjectID:   testQdrantProjectID,
+		GroupKey:    "feature-1",
+		Title:       "Feature 1",
+		Description: "Test description",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := store.AddGroup(ctx, group); err != nil {
+		t.Fatalf("AddGroup failed: %v", err)
+	}
+
+	// 取得して確認
+	retrieved, err := store.GetGroup(ctx, "group-1")
+	if err != nil {
+		t.Fatalf("GetGroup failed: %v", err)
+	}
+
+	if retrieved.GroupKey != "feature-1" {
+		t.Errorf("Expected groupKey 'feature-1', got '%s'", retrieved.GroupKey)
+	}
+	if retrieved.Title != "Feature 1" {
+		t.Errorf("Expected title 'Feature 1', got '%s'", retrieved.Title)
+	}
+}
+
+// TestQdrantStore_GetGroup_Found は存在するグループ取得をテスト
+func TestQdrantStore_GetGroup_Found(t *testing.T) {
+	t.Skip("GetGroup is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	group := &model.Group{
+		ID:        "group-test",
+		ProjectID: testQdrantProjectID,
+		GroupKey:  "test-group",
+		Title:     "Test Group",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	store.AddGroup(ctx, group)
+
+	retrieved, err := store.GetGroup(ctx, "group-test")
+	if err != nil {
+		t.Fatalf("GetGroup failed: %v", err)
+	}
+	if retrieved.ID != "group-test" {
+		t.Errorf("Expected ID 'group-test', got '%s'", retrieved.ID)
+	}
+}
+
+// TestQdrantStore_GetGroup_NotFound は存在しないグループ取得をテスト
+func TestQdrantStore_GetGroup_NotFound(t *testing.T) {
+	t.Skip("GetGroup is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	_, err := store.GetGroup(ctx, "nonexistent")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
+// TestQdrantStore_GetGroupByKey_Found はProjectID+GroupKeyでグループ取得をテスト
+func TestQdrantStore_GetGroupByKey_Found(t *testing.T) {
+	t.Skip("GetGroupByKey is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	group := &model.Group{
+		ID:        "group-key-test",
+		ProjectID: testQdrantProjectID,
+		GroupKey:  "feature-x",
+		Title:     "Feature X",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	store.AddGroup(ctx, group)
+
+	retrieved, err := store.GetGroupByKey(ctx, testQdrantProjectID, "feature-x")
+	if err != nil {
+		t.Fatalf("GetGroupByKey failed: %v", err)
+	}
+	if retrieved.ID != "group-key-test" {
+		t.Errorf("Expected ID 'group-key-test', got '%s'", retrieved.ID)
+	}
+}
+
+// TestQdrantStore_GetGroupByKey_NotFound は存在しないキー取得をテスト
+func TestQdrantStore_GetGroupByKey_NotFound(t *testing.T) {
+	t.Skip("GetGroupByKey is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	_, err := store.GetGroupByKey(ctx, testQdrantProjectID, "nonexistent")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
+// TestQdrantStore_UpdateGroup_Basic はグループ更新をテスト
+func TestQdrantStore_UpdateGroup_Basic(t *testing.T) {
+	t.Skip("UpdateGroup is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	group := &model.Group{
+		ID:          "update-test",
+		ProjectID:   testQdrantProjectID,
+		GroupKey:    "feature-1",
+		Title:       "Original Title",
+		Description: "Original",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	store.AddGroup(ctx, group)
+
+	// 更新
+	group.Title = "Updated Title"
+	group.Description = "Updated"
+	group.UpdatedAt = time.Now().UTC()
+	if err := store.UpdateGroup(ctx, group); err != nil {
+		t.Fatalf("UpdateGroup failed: %v", err)
+	}
+
+	retrieved, _ := store.GetGroup(ctx, "update-test")
+	if retrieved.Title != "Updated Title" {
+		t.Errorf("Expected title 'Updated Title', got '%s'", retrieved.Title)
+	}
+	if retrieved.Description != "Updated" {
+		t.Errorf("Expected description 'Updated', got '%s'", retrieved.Description)
+	}
+}
+
+// TestQdrantStore_UpdateGroup_NotFound は存在しないグループ更新をテスト
+func TestQdrantStore_UpdateGroup_NotFound(t *testing.T) {
+	t.Skip("UpdateGroup is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	group := &model.Group{
+		ID:        "nonexistent",
+		ProjectID: testQdrantProjectID,
+		GroupKey:  "test",
+		Title:     "Test",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err := store.UpdateGroup(ctx, group)
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
+// TestQdrantStore_DeleteGroup_Success はグループ削除をテスト
+func TestQdrantStore_DeleteGroup_Success(t *testing.T) {
+	t.Skip("DeleteGroup is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	group := &model.Group{
+		ID:        "delete-test",
+		ProjectID: testQdrantProjectID,
+		GroupKey:  "to-delete",
+		Title:     "To Delete",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	store.AddGroup(ctx, group)
+
+	if err := store.DeleteGroup(ctx, "delete-test"); err != nil {
+		t.Fatalf("DeleteGroup failed: %v", err)
+	}
+
+	_, err := store.GetGroup(ctx, "delete-test")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+// TestQdrantStore_DeleteGroup_NotFound は存在しないグループ削除をテスト
+func TestQdrantStore_DeleteGroup_NotFound(t *testing.T) {
+	t.Skip("DeleteGroup is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	err := store.DeleteGroup(ctx, "nonexistent")
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got %v", err)
+	}
+}
+
+// TestQdrantStore_ListGroups_Basic はプロジェクト内グループ一覧をテスト
+func TestQdrantStore_ListGroups_Basic(t *testing.T) {
+	t.Skip("ListGroups is not implemented yet")
+
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	group1 := &model.Group{
+		ID:        "list-1",
+		ProjectID: testQdrantProjectID,
+		GroupKey:  "feature-1",
+		Title:     "Feature 1",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	group2 := &model.Group{
+		ID:        "list-2",
+		ProjectID: testQdrantProjectID,
+		GroupKey:  "feature-2",
+		Title:     "Feature 2",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	group3 := &model.Group{
+		ID:        "list-3",
+		ProjectID: "/other/project",
+		GroupKey:  "feature-3",
+		Title:     "Feature 3",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	store.AddGroup(ctx, group1)
+	store.AddGroup(ctx, group2)
+	store.AddGroup(ctx, group3)
+
+	groups, err := store.ListGroups(ctx, testQdrantProjectID)
+	if err != nil {
+		t.Fatalf("ListGroups failed: %v", err)
+	}
+
+	if len(groups) != 2 {
+		t.Errorf("Expected 2 groups, got %d", len(groups))
+	}
+}
