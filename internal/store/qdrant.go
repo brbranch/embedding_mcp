@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"sort"
 	"strconv"
@@ -137,6 +136,16 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 		if err != nil {
 			return fmt.Errorf("failed to create collection: %w", err)
 		}
+
+		// createdAtTimestampにpayload indexを作成（ListRecentのOrderBy用）
+		_, err = s.client.CreateFieldIndex(ctx, &qdrant.CreateFieldIndexCollection{
+			CollectionName: collectionName,
+			FieldName:      "createdAtTimestamp",
+			FieldType:      qdrant.PtrOf(qdrant.FieldType_FieldTypeFloat),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create payload index: %w", err)
+		}
 	}
 
 	// GlobalConfig用コレクション作成
@@ -189,9 +198,12 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 func (s *QdrantStore) Close() error {
 	s.mu.Lock()
 	s.initialized = false
+	client := s.client
+	s.client = nil // 他goroutineからのアクセスを防ぐ
 	s.mu.Unlock()
-	if s.client != nil {
-		s.client.Close()
+
+	if client != nil {
+		client.Close()
 	}
 	return nil
 }
@@ -411,20 +423,18 @@ func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 	// フィルタを構築
 	filter := buildListFilter(opts)
 
-	// Qdrant Scrollは順序保証がないため、十分な件数を取得してソートする
-	// 最低1000件、またはlimit*10のうち大きい方を取得
-	fetchLimit := opts.Limit * 10
-	if fetchLimit < 1000 {
-		fetchLimit = 1000
-	}
-
-	// Qdrantで全ポイントを取得
+	// Qdrant ScrollのOrderByを使用してcreatedAtTimestamp降順で取得
+	// これにより「最新N件」を正確に取得できる
 	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
 		CollectionName: s.noteCollection(),
 		Filter:         filter,
-		Limit:          qdrant.PtrOf(uint32(fetchLimit)),
+		Limit:          qdrant.PtrOf(uint32(opts.Limit)),
 		WithPayload:    qdrant.NewWithPayload(true),
 		WithVectors:    qdrant.NewWithVectors(false),
+		OrderBy: &qdrant.OrderBy{
+			Key:       "createdAtTimestamp",
+			Direction: qdrant.PtrOf(qdrant.Direction_Desc),
+		},
 	})
 
 	if err != nil {
@@ -439,33 +449,6 @@ func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 			continue
 		}
 		notes = append(notes, note)
-	}
-
-	// createdAt降順でソート
-	// パースエラーの場合はzero timeとして末尾にソート
-	sort.Slice(notes, func(i, j int) bool {
-		if notes[i].CreatedAt == nil {
-			return false // nilは末尾
-		}
-		if notes[j].CreatedAt == nil {
-			return true // nilは末尾
-		}
-		ti, erri := time.Parse(time.RFC3339, *notes[i].CreatedAt)
-		tj, errj := time.Parse(time.RFC3339, *notes[j].CreatedAt)
-		if erri != nil {
-			log.Printf("warning: failed to parse createdAt for note %s: %v", notes[i].ID, erri)
-			return false // パースエラーは末尾
-		}
-		if errj != nil {
-			log.Printf("warning: failed to parse createdAt for note %s: %v", notes[j].ID, errj)
-			return true // パースエラーは末尾
-		}
-		return ti.After(tj)
-	})
-
-	// Limit制限
-	if opts.Limit > 0 && len(notes) > opts.Limit {
-		notes = notes[:opts.Limit]
 	}
 
 	return notes, nil
