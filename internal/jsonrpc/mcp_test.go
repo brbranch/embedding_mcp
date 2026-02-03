@@ -67,9 +67,9 @@ func TestHandle_ToolsList_Success(t *testing.T) {
 	resultMap := resp["result"].(map[string]any)
 	tools := resultMap["tools"].([]any)
 
-	// 10個のツールがあることを確認
-	if len(tools) != 10 {
-		t.Errorf("expected 10 tools, got %d", len(tools))
+	// 15個のツールがあることを確認
+	if len(tools) != 15 {
+		t.Errorf("expected 15 tools, got %d", len(tools))
 	}
 
 	// ツール名を確認（ドットはアンダースコアに変換）
@@ -84,6 +84,11 @@ func TestHandle_ToolsList_Success(t *testing.T) {
 		"memory_set_config",
 		"memory_upsert_global",
 		"memory_get_global",
+		"memory_group_create",
+		"memory_group_get",
+		"memory_group_update",
+		"memory_group_delete",
+		"memory_group_list",
 	}
 
 	toolNames := make(map[string]bool)

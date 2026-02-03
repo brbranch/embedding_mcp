@@ -113,6 +113,25 @@ func (m *mockGlobalService) DeleteByID(ctx context.Context, id string) error {
 	return nil
 }
 
+// mockGroupService はテスト用のGroupService
+type mockGroupService struct{}
+
+func (m *mockGroupService) CreateGroup(ctx context.Context, req *service.CreateGroupRequest) (*service.CreateGroupResponse, error) {
+	return &service.CreateGroupResponse{ID: "test-group-id", Namespace: "test-ns"}, nil
+}
+func (m *mockGroupService) GetGroup(ctx context.Context, id string) (*service.GetGroupResponse, error) {
+	return &service.GetGroupResponse{ID: id, Namespace: "test-ns"}, nil
+}
+func (m *mockGroupService) UpdateGroup(ctx context.Context, req *service.UpdateGroupRequest) error {
+	return nil
+}
+func (m *mockGroupService) DeleteGroup(ctx context.Context, id string) error {
+	return nil
+}
+func (m *mockGroupService) ListGroups(ctx context.Context, projectID string) (*service.ListGroupsResponse, error) {
+	return &service.ListGroupsResponse{Namespace: "test-ns", Groups: []service.ListGroupItem{}}, nil
+}
+
 // === ヘルパー関数 ===
 
 func makeRequest(method string, params any) []byte {
@@ -149,6 +168,7 @@ func newTestHandler() *Handler {
 		&mockNoteService{},
 		&mockConfigService{},
 		&mockGlobalService{},
+		&mockGroupService{},
 	)
 }
 
