@@ -98,6 +98,26 @@ func (s *SQLiteStore) Initialize(ctx context.Context, namespace string) error {
 		return fmt.Errorf("failed to create global_configs table: %w", err)
 	}
 
+	// groupsテーブル作成
+	groupsSQL := `
+	CREATE TABLE IF NOT EXISTS groups (
+		id TEXT PRIMARY KEY,
+		namespace TEXT NOT NULL,
+		project_id TEXT NOT NULL,
+		group_key TEXT NOT NULL,
+		title TEXT NOT NULL,
+		description TEXT,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL,
+		UNIQUE(namespace, project_id, group_key)
+	);
+	CREATE INDEX IF NOT EXISTS idx_groups_project ON groups(namespace, project_id);
+	`
+
+	if _, err := s.db.ExecContext(ctx, groupsSQL); err != nil {
+		return fmt.Errorf("failed to create groups table: %w", err)
+	}
+
 	s.namespace = namespace
 	s.initialized = true
 	return nil
@@ -649,6 +669,227 @@ func (s *SQLiteStore) DeleteGlobalByID(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+// AddGroup はグループを追加する
+func (s *SQLiteStore) AddGroup(ctx context.Context, group *model.Group) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO groups (id, namespace, project_id, group_key, title, description, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, group.ID, s.namespace, group.ProjectID, group.GroupKey, group.Title, group.Description,
+		group.CreatedAt.Format(time.RFC3339), group.UpdatedAt.Format(time.RFC3339))
+
+	if err != nil {
+		return fmt.Errorf("failed to insert group: %w", err)
+	}
+
+	return nil
+}
+
+// GetGroup はIDでグループを取得する
+func (s *SQLiteStore) GetGroup(ctx context.Context, id string) (*model.Group, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, project_id, group_key, title, description, created_at, updated_at
+		FROM groups
+		WHERE id = ? AND namespace = ?
+	`, id, s.namespace)
+
+	group, err := s.scanGroup(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group: %w", err)
+	}
+
+	return group, nil
+}
+
+// GetGroupByKey はProjectIDとGroupKeyでグループを取得する
+func (s *SQLiteStore) GetGroupByKey(ctx context.Context, projectID, groupKey string) (*model.Group, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, project_id, group_key, title, description, created_at, updated_at
+		FROM groups
+		WHERE namespace = ? AND project_id = ? AND group_key = ?
+	`, s.namespace, projectID, groupKey)
+
+	group, err := s.scanGroup(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group by key: %w", err)
+	}
+
+	return group, nil
+}
+
+// UpdateGroup はグループを更新する
+func (s *SQLiteStore) UpdateGroup(ctx context.Context, group *model.Group) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE groups
+		SET title = ?, description = ?, updated_at = ?
+		WHERE id = ? AND namespace = ?
+	`, group.Title, group.Description, group.UpdatedAt.Format(time.RFC3339), group.ID, s.namespace)
+
+	if err != nil {
+		return fmt.Errorf("failed to update group: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+// DeleteGroup はグループを削除する
+func (s *SQLiteStore) DeleteGroup(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM groups WHERE id = ? AND namespace = ?
+	`, id, s.namespace)
+	if err != nil {
+		return fmt.Errorf("failed to delete group: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+// ListGroups はプロジェクト内の全グループを取得する
+func (s *SQLiteStore) ListGroups(ctx context.Context, projectID string) ([]*model.Group, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, project_id, group_key, title, description, created_at, updated_at
+		FROM groups
+		WHERE namespace = ? AND project_id = ?
+		ORDER BY created_at ASC
+	`, s.namespace, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query groups: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []*model.Group
+	for rows.Next() {
+		var (
+			id, projectID, groupKey, title string
+			description                    sql.NullString
+			createdAt, updatedAt           string
+		)
+
+		if err := rows.Scan(&id, &projectID, &groupKey, &title, &description, &createdAt, &updatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		createdTime, _ := time.Parse(time.RFC3339, createdAt)
+		updatedTime, _ := time.Parse(time.RFC3339, updatedAt)
+
+		group := &model.Group{
+			ID:        id,
+			ProjectID: projectID,
+			GroupKey:  groupKey,
+			Title:     title,
+			CreatedAt: createdTime,
+			UpdatedAt: updatedTime,
+		}
+
+		if description.Valid {
+			group.Description = description.String
+		}
+
+		groups = append(groups, group)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return groups, nil
+}
+
+func (s *SQLiteStore) scanGroup(row *sql.Row) (*model.Group, error) {
+	var (
+		id, projectID, groupKey, title string
+		description                    sql.NullString
+		createdAt, updatedAt           string
+	)
+
+	if err := row.Scan(&id, &projectID, &groupKey, &title, &description, &createdAt, &updatedAt); err != nil {
+		return nil, err
+	}
+
+	createdTime, _ := time.Parse(time.RFC3339, createdAt)
+	updatedTime, _ := time.Parse(time.RFC3339, updatedAt)
+
+	group := &model.Group{
+		ID:        id,
+		ProjectID: projectID,
+		GroupKey:  groupKey,
+		Title:     title,
+		CreatedAt: createdTime,
+		UpdatedAt: updatedTime,
+	}
+
+	if description.Valid {
+		group.Description = description.String
+	}
+
+	return group, nil
 }
 
 // Helper functions

@@ -95,9 +95,9 @@ func TestE2E_MCP_FullFlow(t *testing.T) {
 		result := resp.Result.(map[string]any)
 		tools := result["tools"].([]any)
 
-		// 10個のツールがあることを確認
-		if len(tools) != 10 {
-			t.Errorf("expected 10 tools, got %d", len(tools))
+		// 15個のツールがあることを確認
+		if len(tools) != 15 {
+			t.Errorf("expected 15 tools, got %d", len(tools))
 		}
 
 		// 必要なツールが存在することを確認
@@ -124,6 +124,11 @@ func TestE2E_MCP_FullFlow(t *testing.T) {
 			"memory_set_config",
 			"memory_upsert_global",
 			"memory_get_global",
+			"memory_group_create",
+			"memory_group_get",
+			"memory_group_update",
+			"memory_group_delete",
+			"memory_group_list",
 		}
 
 		for _, expected := range expectedTools {

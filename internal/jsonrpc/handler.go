@@ -16,6 +16,7 @@ type Handler struct {
 	noteService   service.NoteService
 	configService service.ConfigService
 	globalService service.GlobalService
+	groupService  service.GroupService
 }
 
 // New は新しいHandlerを生成
@@ -23,11 +24,13 @@ func New(
 	noteService service.NoteService,
 	configService service.ConfigService,
 	globalService service.GlobalService,
+	groupService service.GroupService,
 ) *Handler {
 	return &Handler{
 		noteService:   noteService,
 		configService: configService,
 		globalService: globalService,
+		groupService:  groupService,
 	}
 }
 
@@ -116,6 +119,16 @@ func (h *Handler) dispatch(ctx context.Context, id any, method string, params an
 		return h.handleGetGlobal(ctx, params)
 	case "memory.delete":
 		return h.handleDelete(ctx, params)
+	case "memory.group_create":
+		return h.handleGroupCreate(ctx, params)
+	case "memory.group_get":
+		return h.handleGroupGet(ctx, params)
+	case "memory.group_update":
+		return h.handleGroupUpdate(ctx, params)
+	case "memory.group_delete":
+		return h.handleGroupDelete(ctx, params)
+	case "memory.group_list":
+		return h.handleGroupList(ctx, params)
 	default:
 		return nil, &methodNotFoundError{method: method}
 	}
@@ -132,7 +145,10 @@ func (h *Handler) mapError(id any, err error) *model.ErrorResponse {
 	// invalid params
 	if errors.Is(err, service.ErrProjectIDRequired) ||
 		errors.Is(err, service.ErrGroupIDRequired) ||
+		errors.Is(err, service.ErrGroupKeyRequired) ||
+		errors.Is(err, service.ErrTitleRequired) ||
 		errors.Is(err, service.ErrInvalidGroupID) ||
+		errors.Is(err, service.ErrInvalidGroupKey) ||
 		errors.Is(err, service.ErrTextRequired) ||
 		errors.Is(err, service.ErrQueryRequired) ||
 		errors.Is(err, service.ErrIDRequired) ||
@@ -149,8 +165,16 @@ func (h *Handler) mapError(id any, err error) *model.ErrorResponse {
 	if errors.Is(err, service.ErrGlobalConfigNotFound) {
 		return model.NewErrorResponse(id, model.ErrCodeNotFound, "Global config not found", nil)
 	}
+	if errors.Is(err, service.ErrGroupNotFound) {
+		return model.NewErrorResponse(id, model.ErrCodeNotFound, "Group not found", nil)
+	}
 	if errors.Is(err, errNotFound) {
 		return model.NewErrorResponse(id, model.ErrCodeNotFound, "Not found", nil)
+	}
+
+	// conflict (duplicate key)
+	if errors.Is(err, service.ErrGroupKeyExists) {
+		return model.NewErrorResponse(id, model.ErrCodeConflict, err.Error(), nil)
 	}
 
 	// invalid key prefix

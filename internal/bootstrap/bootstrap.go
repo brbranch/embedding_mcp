@@ -19,6 +19,7 @@ type Services struct {
 	NoteService   service.NoteService
 	ConfigService service.ConfigService
 	GlobalService service.GlobalService
+	GroupService  service.GroupService
 	Config        *model.Config
 	Namespace     string
 }
@@ -86,6 +87,7 @@ func Initialize(ctx context.Context, configPath string) (*Services, func(), erro
 	noteService := service.NewNoteService(emb, st, namespace)
 	configService := service.NewConfigService(configManager)
 	globalService := service.NewGlobalService(st, namespace)
+	groupService := service.NewGroupService(st, namespace)
 
 	cleanup := func() {
 		st.Close()
@@ -95,6 +97,7 @@ func Initialize(ctx context.Context, configPath string) (*Services, func(), erro
 		NoteService:   noteService,
 		ConfigService: configService,
 		GlobalService: globalService,
+		GroupService:  groupService,
 		Config:        cfg,
 		Namespace:     namespace,
 	}, cleanup, nil

@@ -13,11 +13,12 @@ import (
 
 // MemoryStore はテスト用のインメモリStore実装
 type MemoryStore struct {
-	mu               sync.RWMutex
-	notes            map[string]*noteEntry      // key: note.ID
-	globalConfigs    map[string]*model.GlobalConfig // key: projectID + key
-	initialized      bool
-	namespace        string
+	mu            sync.RWMutex
+	notes         map[string]*noteEntry          // key: note.ID
+	globalConfigs map[string]*model.GlobalConfig // key: projectID + key
+	groups        map[string]*model.Group        // key: group.ID
+	initialized   bool
+	namespace     string
 }
 
 type noteEntry struct {
@@ -30,6 +31,7 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		notes:         make(map[string]*noteEntry),
 		globalConfigs: make(map[string]*model.GlobalConfig),
+		groups:        make(map[string]*model.Group),
 	}
 }
 
@@ -50,6 +52,7 @@ func (s *MemoryStore) Close() error {
 
 	s.notes = make(map[string]*noteEntry)
 	s.globalConfigs = make(map[string]*model.GlobalConfig)
+	s.groups = make(map[string]*model.Group)
 	s.initialized = false
 	return nil
 }
@@ -357,6 +360,160 @@ func (s *MemoryStore) DeleteGlobalByID(ctx context.Context, id string) error {
 	}
 
 	return ErrNotFound
+}
+
+// AddGroup はグループを追加する
+func (s *MemoryStore) AddGroup(ctx context.Context, group *model.Group) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	// ディープコピー
+	groupCopy := &model.Group{
+		ID:          group.ID,
+		ProjectID:   group.ProjectID,
+		GroupKey:    group.GroupKey,
+		Title:       group.Title,
+		Description: group.Description,
+		CreatedAt:   group.CreatedAt,
+		UpdatedAt:   group.UpdatedAt,
+	}
+
+	s.groups[group.ID] = groupCopy
+	return nil
+}
+
+// GetGroup はIDでグループを取得する
+func (s *MemoryStore) GetGroup(ctx context.Context, id string) (*model.Group, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	group, ok := s.groups[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	// ディープコピー
+	return &model.Group{
+		ID:          group.ID,
+		ProjectID:   group.ProjectID,
+		GroupKey:    group.GroupKey,
+		Title:       group.Title,
+		Description: group.Description,
+		CreatedAt:   group.CreatedAt,
+		UpdatedAt:   group.UpdatedAt,
+	}, nil
+}
+
+// GetGroupByKey はProjectIDとGroupKeyでグループを取得する
+func (s *MemoryStore) GetGroupByKey(ctx context.Context, projectID, groupKey string) (*model.Group, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	for _, group := range s.groups {
+		if group.ProjectID == projectID && group.GroupKey == groupKey {
+			// ディープコピー
+			return &model.Group{
+				ID:          group.ID,
+				ProjectID:   group.ProjectID,
+				GroupKey:    group.GroupKey,
+				Title:       group.Title,
+				Description: group.Description,
+				CreatedAt:   group.CreatedAt,
+				UpdatedAt:   group.UpdatedAt,
+			}, nil
+		}
+	}
+
+	return nil, ErrNotFound
+}
+
+// UpdateGroup はグループを更新する
+func (s *MemoryStore) UpdateGroup(ctx context.Context, group *model.Group) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	if _, ok := s.groups[group.ID]; !ok {
+		return ErrNotFound
+	}
+
+	// ディープコピー
+	s.groups[group.ID] = &model.Group{
+		ID:          group.ID,
+		ProjectID:   group.ProjectID,
+		GroupKey:    group.GroupKey,
+		Title:       group.Title,
+		Description: group.Description,
+		CreatedAt:   group.CreatedAt,
+		UpdatedAt:   group.UpdatedAt,
+	}
+
+	return nil
+}
+
+// DeleteGroup はグループを削除する
+func (s *MemoryStore) DeleteGroup(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.initialized {
+		return ErrNotInitialized
+	}
+
+	if _, ok := s.groups[id]; !ok {
+		return ErrNotFound
+	}
+
+	delete(s.groups, id)
+	return nil
+}
+
+// ListGroups はプロジェクト内の全グループを取得する
+func (s *MemoryStore) ListGroups(ctx context.Context, projectID string) ([]*model.Group, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	var groups []*model.Group
+	for _, group := range s.groups {
+		if group.ProjectID == projectID {
+			// ディープコピー
+			groups = append(groups, &model.Group{
+				ID:          group.ID,
+				ProjectID:   group.ProjectID,
+				GroupKey:    group.GroupKey,
+				Title:       group.Title,
+				Description: group.Description,
+				CreatedAt:   group.CreatedAt,
+				UpdatedAt:   group.UpdatedAt,
+			})
+		}
+	}
+
+	// createdAt昇順でソート
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].CreatedAt.Before(groups[j].CreatedAt)
+	})
+
+	return groups, nil
 }
 
 // Helper methods

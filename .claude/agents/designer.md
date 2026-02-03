@@ -1,6 +1,6 @@
 ---
 name: designer
-description: 実装計画の作成を担当するアーキテクト。TODO.md や requirements/ から要件を確認し、docs/plans/ に L3 詳細度の実装計画を作成する。
+description: 実装計画の作成を担当するアーキテクト。「設計して」「計画を立てて」と依頼された場合、または新機能の実装前に設計が必要な場合に使用すること。
 model: opus
 tools: Read, Glob, Grep, Write, Edit, Bash
 ---

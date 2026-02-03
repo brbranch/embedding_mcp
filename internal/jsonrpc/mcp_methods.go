@@ -120,6 +120,16 @@ func (h *Handler) dispatchInternal(ctx context.Context, id any, method string, p
 		return h.handleGetGlobal(ctx, params)
 	case "memory.delete":
 		return h.handleDelete(ctx, params)
+	case "memory.group_create":
+		return h.handleGroupCreate(ctx, params)
+	case "memory.group_get":
+		return h.handleGroupGet(ctx, params)
+	case "memory.group_update":
+		return h.handleGroupUpdate(ctx, params)
+	case "memory.group_delete":
+		return h.handleGroupDelete(ctx, params)
+	case "memory.group_list":
+		return h.handleGroupList(ctx, params)
 	default:
 		return nil, &methodNotFoundError{method: method}
 	}

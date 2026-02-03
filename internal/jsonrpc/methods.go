@@ -270,6 +270,123 @@ func (h *Handler) handleDelete(ctx context.Context, params any) (any, error) {
 	return nil, err
 }
 
+// handleGroupCreate は memory.group_create を処理
+func (h *Handler) handleGroupCreate(ctx context.Context, params any) (any, error) {
+	var p GroupCreateParams
+	if err := mapParams(params, &p); err != nil {
+		return nil, err
+	}
+
+	resp, err := h.groupService.CreateGroup(ctx, p.ToRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"id":        resp.ID,
+		"namespace": resp.Namespace,
+	}, nil
+}
+
+// handleGroupGet は memory.group_get を処理
+func (h *Handler) handleGroupGet(ctx context.Context, params any) (any, error) {
+	var p GroupGetParams
+	if err := mapParams(params, &p); err != nil {
+		return nil, err
+	}
+
+	if p.ID == "" {
+		return nil, errIDRequired
+	}
+
+	resp, err := h.groupService.GetGroup(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"id":          resp.ID,
+		"projectId":   resp.ProjectID,
+		"groupKey":    resp.GroupKey,
+		"title":       resp.Title,
+		"description": resp.Description,
+		"createdAt":   resp.CreatedAt,
+		"updatedAt":   resp.UpdatedAt,
+		"namespace":   resp.Namespace,
+	}, nil
+}
+
+// handleGroupUpdate は memory.group_update を処理
+func (h *Handler) handleGroupUpdate(ctx context.Context, params any) (any, error) {
+	var p GroupUpdateParams
+	if err := mapParams(params, &p); err != nil {
+		return nil, err
+	}
+
+	if p.ID == "" {
+		return nil, errIDRequired
+	}
+
+	if err := h.groupService.UpdateGroup(ctx, p.ToRequest()); err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"ok": true,
+	}, nil
+}
+
+// handleGroupDelete は memory.group_delete を処理
+func (h *Handler) handleGroupDelete(ctx context.Context, params any) (any, error) {
+	var p GroupDeleteParams
+	if err := mapParams(params, &p); err != nil {
+		return nil, err
+	}
+
+	if p.ID == "" {
+		return nil, errIDRequired
+	}
+
+	if err := h.groupService.DeleteGroup(ctx, p.ID); err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"ok": true,
+	}, nil
+}
+
+// handleGroupList は memory.group_list を処理
+func (h *Handler) handleGroupList(ctx context.Context, params any) (any, error) {
+	var p GroupListParams
+	if err := mapParams(params, &p); err != nil {
+		return nil, err
+	}
+
+	resp, err := h.groupService.ListGroups(ctx, p.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+
+	groups := make([]map[string]any, len(resp.Groups))
+	for i, g := range resp.Groups {
+		groups[i] = map[string]any{
+			"id":          g.ID,
+			"projectId":   g.ProjectID,
+			"groupKey":    g.GroupKey,
+			"title":       g.Title,
+			"description": g.Description,
+			"createdAt":   g.CreatedAt,
+			"updatedAt":   g.UpdatedAt,
+		}
+	}
+
+	return map[string]any{
+		"namespace": resp.Namespace,
+		"groups":    groups,
+	}, nil
+}
+
 // mapParams はanyをターゲット構造体にマッピング
 func mapParams(params any, target any) error {
 	if params == nil {

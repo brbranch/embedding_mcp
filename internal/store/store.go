@@ -27,6 +27,14 @@ type Store interface {
 	GetGlobalByID(ctx context.Context, id string) (*model.GlobalConfig, error)
 	DeleteGlobalByID(ctx context.Context, id string) error
 
+	// Group操作
+	AddGroup(ctx context.Context, group *model.Group) error
+	GetGroup(ctx context.Context, id string) (*model.Group, error)
+	GetGroupByKey(ctx context.Context, projectID, groupKey string) (*model.Group, error)
+	UpdateGroup(ctx context.Context, group *model.Group) error
+	DeleteGroup(ctx context.Context, id string) error
+	ListGroups(ctx context.Context, projectID string) ([]*model.Group, error)
+
 	// 初期化・終了
 	Initialize(ctx context.Context, namespace string) error
 	Close() error

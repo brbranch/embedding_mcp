@@ -44,6 +44,7 @@ const (
 	ErrCodeInvalidKeyPrefix = -32002 // Invalid key prefix (global.* required)
 	ErrCodeNotFound         = -32003 // Resource not found
 	ErrCodeProviderError    = -32004 // Embedding provider error
+	ErrCodeConflict         = -32005 // Resource conflict (e.g., duplicate key)
 )
 
 // NewResponse は成功レスポンスを生成

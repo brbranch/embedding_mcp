@@ -287,18 +287,119 @@ var mcpTools = []model.Tool{
 			Required: []string{"projectId", "key"},
 		},
 	},
+	{
+		Name:        "memory_group_create",
+		Description: "Create a new group for organizing notes",
+		InputSchema: model.JSONSchema{
+			Type: "object",
+			Properties: map[string]model.JSONSchema{
+				"projectId": {
+					Type:        "string",
+					Description: "Project ID",
+				},
+				"groupKey": {
+					Type:        "string",
+					Description: "Unique key for the group (alphanumeric, hyphen, underscore only; 'global' is reserved)",
+				},
+				"title": {
+					Type:        "string",
+					Description: "Display title for the group",
+				},
+				"description": {
+					Type:        "string",
+					Description: "Optional description for the group",
+				},
+			},
+			Required: []string{"projectId", "groupKey", "title"},
+		},
+	},
+	{
+		Name:        "memory_group_get",
+		Description: "Get a group by its ID",
+		InputSchema: model.JSONSchema{
+			Type: "object",
+			Properties: map[string]model.JSONSchema{
+				"id": {
+					Type:        "string",
+					Description: "The group ID",
+				},
+			},
+			Required: []string{"id"},
+		},
+	},
+	{
+		Name:        "memory_group_update",
+		Description: "Update an existing group (groupKey cannot be changed)",
+		InputSchema: model.JSONSchema{
+			Type: "object",
+			Properties: map[string]model.JSONSchema{
+				"id": {
+					Type:        "string",
+					Description: "The group ID to update",
+				},
+				"patch": {
+					Type:        "object",
+					Description: "Fields to update",
+					Properties: map[string]model.JSONSchema{
+						"title": {
+							Type:        "string",
+							Description: "New title",
+						},
+						"description": {
+							Type:        "string",
+							Description: "New description",
+						},
+					},
+				},
+			},
+			Required: []string{"id", "patch"},
+		},
+	},
+	{
+		Name:        "memory_group_delete",
+		Description: "Delete a group by ID",
+		InputSchema: model.JSONSchema{
+			Type: "object",
+			Properties: map[string]model.JSONSchema{
+				"id": {
+					Type:        "string",
+					Description: "The group ID to delete",
+				},
+			},
+			Required: []string{"id"},
+		},
+	},
+	{
+		Name:        "memory_group_list",
+		Description: "List all groups in a project",
+		InputSchema: model.JSONSchema{
+			Type: "object",
+			Properties: map[string]model.JSONSchema{
+				"projectId": {
+					Type:        "string",
+					Description: "Project ID to list groups from",
+				},
+			},
+			Required: []string{"projectId"},
+		},
+	},
 }
 
 // toolNameToMethod はMCPツール名から内部メソッド名へのマッピング
 var toolNameToMethod = map[string]string{
-	"memory_add_note":     "memory.add_note",
-	"memory_search":       "memory.search",
-	"memory_get":          "memory.get",
-	"memory_update":       "memory.update",
-	"memory_delete":       "memory.delete",
-	"memory_list_recent":  "memory.list_recent",
-	"memory_get_config":   "memory.get_config",
-	"memory_set_config":   "memory.set_config",
+	"memory_add_note":      "memory.add_note",
+	"memory_search":        "memory.search",
+	"memory_get":           "memory.get",
+	"memory_update":        "memory.update",
+	"memory_delete":        "memory.delete",
+	"memory_list_recent":   "memory.list_recent",
+	"memory_get_config":    "memory.get_config",
+	"memory_set_config":    "memory.set_config",
 	"memory_upsert_global": "memory.upsert_global",
-	"memory_get_global":   "memory.get_global",
+	"memory_get_global":    "memory.get_global",
+	"memory_group_create":  "memory.group_create",
+	"memory_group_get":     "memory.group_get",
+	"memory_group_update":  "memory.group_update",
+	"memory_group_delete":  "memory.group_delete",
+	"memory_group_list":    "memory.group_list",
 }
