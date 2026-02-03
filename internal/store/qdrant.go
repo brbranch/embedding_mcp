@@ -7,11 +7,33 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/brbranch/embedding_mcp/internal/model"
 	"github.com/qdrant/go-client/qdrant"
 )
+
+// sanitizeCollectionName はQdrantのコレクション名として使用できる文字列に変換する
+// Qdrantは ":" などの特殊文字をコレクション名に使用できないため
+func sanitizeCollectionName(name string) string {
+	return strings.ReplaceAll(name, ":", "_")
+}
+
+// noteCollection はNote用コレクション名を返す
+func (s *QdrantStore) noteCollection() string {
+	return sanitizeCollectionName(s.namespace)
+}
+
+// globalConfigCollection はGlobalConfig用コレクション名を返す
+func (s *QdrantStore) globalConfigCollection() string {
+	return sanitizeCollectionName(s.namespace) + "_global_configs"
+}
+
+// groupCollection はGroup用コレクション名を返す
+func (s *QdrantStore) groupCollection() string {
+	return sanitizeCollectionName(s.namespace) + "_groups"
+}
 
 // QdrantStore はQdrantを使用したStore実装
 type QdrantStore struct {
@@ -73,8 +95,11 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 		return ErrConnectionFailed
 	}
 
+	// コレクション名をサニタイズ（Qdrantは ":" を許可しない）
+	collectionName := sanitizeCollectionName(namespace)
+
 	// Note用コレクション存在確認
-	exists, err := s.client.CollectionExists(ctx, namespace)
+	exists, err := s.client.CollectionExists(ctx, collectionName)
 	if err != nil {
 		return fmt.Errorf("failed to check collection existence: %w", err)
 	}
@@ -82,7 +107,7 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 	// Note用コレクションが存在しない場合は作成
 	if !exists {
 		err = s.client.CreateCollection(ctx, &qdrant.CreateCollection{
-			CollectionName: namespace,
+			CollectionName: collectionName,
 			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
 				Size:     1536, // デフォルトの埋め込み次元数
 				Distance: qdrant.Distance_Cosine,
@@ -94,7 +119,7 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 	}
 
 	// GlobalConfig用コレクション作成
-	globalConfigCollection := namespace + "_global_configs"
+	globalConfigCollection := collectionName + "_global_configs"
 	exists, err = s.client.CollectionExists(ctx, globalConfigCollection)
 	if err != nil {
 		return fmt.Errorf("failed to check global_configs collection existence: %w", err)
@@ -113,7 +138,7 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 	}
 
 	// Group用コレクション作成
-	groupCollection := namespace + "_groups"
+	groupCollection := collectionName + "_groups"
 	exists, err = s.client.CollectionExists(ctx, groupCollection)
 	if err != nil {
 		return fmt.Errorf("failed to check groups collection existence: %w", err)
@@ -167,7 +192,8 @@ func (s *QdrantStore) AddNote(ctx context.Context, note *model.Note, embedding [
 
 	// ポイントを追加
 	_, err := s.client.Upsert(ctx, &qdrant.UpsertPoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
+		Wait:           qdrant.PtrOf(true),
 		Points: []*qdrant.PointStruct{
 			{
 				Id:      qdrant.NewIDNum(hashID(note.ID)),
@@ -192,7 +218,7 @@ func (s *QdrantStore) Get(ctx context.Context, id string) (*model.Note, error) {
 
 	// IDでポイントを取得
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
 		WithPayload:    qdrant.NewWithPayload(true),
 	})
@@ -222,7 +248,7 @@ func (s *QdrantStore) Update(ctx context.Context, note *model.Note, embedding []
 
 	// 存在確認
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(note.ID))},
 		WithPayload:    qdrant.NewWithPayload(false),
 	})
@@ -245,7 +271,7 @@ func (s *QdrantStore) Update(ctx context.Context, note *model.Note, embedding []
 
 	// ポイントを更新（Upsertで上書き）
 	_, err = s.client.Upsert(ctx, &qdrant.UpsertPoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
 		Points: []*qdrant.PointStruct{
 			{
 				Id:      qdrant.NewIDNum(hashID(note.ID)),
@@ -270,7 +296,7 @@ func (s *QdrantStore) Delete(ctx context.Context, id string) error {
 
 	// 存在確認
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
 		WithPayload:    qdrant.NewWithPayload(false),
 	})
@@ -285,7 +311,7 @@ func (s *QdrantStore) Delete(ctx context.Context, id string) error {
 
 	// ポイントを削除
 	_, err = s.client.Delete(ctx, &qdrant.DeletePoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
 		Points:         qdrant.NewPointsSelector(qdrant.NewIDNum(hashID(id))),
 	})
 
@@ -307,7 +333,7 @@ func (s *QdrantStore) Search(ctx context.Context, embedding []float32, opts Sear
 
 	// Qdrantで検索実行
 	queryResp, err := s.client.Query(ctx, &qdrant.QueryPoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
 		Query:          qdrant.NewQuery(embedding...),
 		Filter:         filter,
 		Limit:          qdrant.PtrOf(uint64(opts.TopK)),
@@ -354,7 +380,7 @@ func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 
 	// Qdrantで全ポイントを取得
 	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
-		CollectionName: s.namespace,
+		CollectionName: s.noteCollection(),
 		Filter:         filter,
 		Limit:          qdrant.PtrOf(uint32(opts.Limit * 2)), // 余裕を持って取得
 		WithPayload:    qdrant.NewWithPayload(true),
@@ -618,7 +644,8 @@ func (s *QdrantStore) UpsertGlobal(ctx context.Context, config *model.GlobalConf
 
 	// ポイントを追加（Upsert）
 	_, err = s.client.Upsert(ctx, &qdrant.UpsertPoints{
-		CollectionName: s.namespace + "_global_configs",
+		CollectionName: s.globalConfigCollection(),
+		Wait:           qdrant.PtrOf(true),
 		Points: []*qdrant.PointStruct{
 			{
 				Id:      qdrant.NewIDNum(hashID(config.ID)),
@@ -651,7 +678,7 @@ func (s *QdrantStore) GetGlobal(ctx context.Context, projectID, key string) (*mo
 	}
 
 	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
-		CollectionName: s.namespace + "_global_configs",
+		CollectionName: s.globalConfigCollection(),
 		Filter:         filter,
 		Limit:          qdrant.PtrOf(uint32(1)),
 		WithPayload:    qdrant.NewWithPayload(true),
@@ -683,7 +710,7 @@ func (s *QdrantStore) GetGlobalByID(ctx context.Context, id string) (*model.Glob
 
 	// IDでポイントを取得
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace + "_global_configs",
+		CollectionName: s.globalConfigCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
 		WithPayload:    qdrant.NewWithPayload(true),
 	})
@@ -713,7 +740,7 @@ func (s *QdrantStore) DeleteGlobalByID(ctx context.Context, id string) error {
 
 	// 存在確認
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace + "_global_configs",
+		CollectionName: s.globalConfigCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
 		WithPayload:    qdrant.NewWithPayload(false),
 	})
@@ -728,7 +755,7 @@ func (s *QdrantStore) DeleteGlobalByID(ctx context.Context, id string) error {
 
 	// ポイントを削除
 	_, err = s.client.Delete(ctx, &qdrant.DeletePoints{
-		CollectionName: s.namespace + "_global_configs",
+		CollectionName: s.globalConfigCollection(),
 		Points:         qdrant.NewPointsSelector(qdrant.NewIDNum(hashID(id))),
 	})
 
@@ -763,7 +790,8 @@ func (s *QdrantStore) AddGroup(ctx context.Context, group *model.Group) error {
 
 	// ポイントを追加
 	_, err := s.client.Upsert(ctx, &qdrant.UpsertPoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
+		Wait:           qdrant.PtrOf(true),
 		Points: []*qdrant.PointStruct{
 			{
 				Id:      qdrant.NewIDNum(hashID(group.ID)),
@@ -788,7 +816,7 @@ func (s *QdrantStore) GetGroup(ctx context.Context, id string) (*model.Group, er
 
 	// IDでポイントを取得
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
 		WithPayload:    qdrant.NewWithPayload(true),
 	})
@@ -826,7 +854,7 @@ func (s *QdrantStore) GetGroupByKey(ctx context.Context, projectID, groupKey str
 	}
 
 	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
 		Filter:         filter,
 		Limit:          qdrant.PtrOf(uint32(1)),
 		WithPayload:    qdrant.NewWithPayload(true),
@@ -858,7 +886,7 @@ func (s *QdrantStore) UpdateGroup(ctx context.Context, group *model.Group) error
 
 	// 存在確認
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(group.ID))},
 		WithPayload:    qdrant.NewWithPayload(false),
 	})
@@ -887,7 +915,8 @@ func (s *QdrantStore) UpdateGroup(ctx context.Context, group *model.Group) error
 
 	// ポイントを更新（Upsert）
 	_, err = s.client.Upsert(ctx, &qdrant.UpsertPoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
+		Wait:           qdrant.PtrOf(true),
 		Points: []*qdrant.PointStruct{
 			{
 				Id:      qdrant.NewIDNum(hashID(group.ID)),
@@ -912,7 +941,7 @@ func (s *QdrantStore) DeleteGroup(ctx context.Context, id string) error {
 
 	// 存在確認
 	points, err := s.client.Get(ctx, &qdrant.GetPoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
 		Ids:            []*qdrant.PointId{qdrant.NewIDNum(hashID(id))},
 		WithPayload:    qdrant.NewWithPayload(false),
 	})
@@ -927,7 +956,7 @@ func (s *QdrantStore) DeleteGroup(ctx context.Context, id string) error {
 
 	// ポイントを削除
 	_, err = s.client.Delete(ctx, &qdrant.DeletePoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
 		Points:         qdrant.NewPointsSelector(qdrant.NewIDNum(hashID(id))),
 	})
 
@@ -953,7 +982,7 @@ func (s *QdrantStore) ListGroups(ctx context.Context, projectID string) ([]*mode
 	}
 
 	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
-		CollectionName: s.namespace + "_groups",
+		CollectionName: s.groupCollection(),
 		Filter:         filter,
 		Limit:          qdrant.PtrOf(uint32(1000)), // 十分大きな値
 		WithPayload:    qdrant.NewWithPayload(true),
@@ -978,6 +1007,42 @@ func (s *QdrantStore) ListGroups(ctx context.Context, projectID string) ([]*mode
 }
 
 // payloadToGlobalConfig はQdrantのpayloadからGlobalConfigを構築する
+// convertQdrantValue はQdrantのValueをGoの値に変換する
+func convertQdrantValue(v *qdrant.Value) any {
+	if v == nil {
+		return nil
+	}
+	switch v.Kind.(type) {
+	case *qdrant.Value_StringValue:
+		return v.GetStringValue()
+	case *qdrant.Value_IntegerValue:
+		return v.GetIntegerValue()
+	case *qdrant.Value_DoubleValue:
+		return v.GetDoubleValue()
+	case *qdrant.Value_BoolValue:
+		return v.GetBoolValue()
+	case *qdrant.Value_StructValue:
+		structVal := v.GetStructValue()
+		if structVal != nil && structVal.Fields != nil {
+			result := make(map[string]any)
+			for key, field := range structVal.Fields {
+				result[key] = convertQdrantValue(field)
+			}
+			return result
+		}
+	case *qdrant.Value_ListValue:
+		listVal := v.GetListValue()
+		if listVal != nil {
+			var values []any
+			for _, item := range listVal.Values {
+				values = append(values, convertQdrantValue(item))
+			}
+			return values
+		}
+	}
+	return nil
+}
+
 func payloadToGlobalConfig(payload map[string]*qdrant.Value) (*model.GlobalConfig, error) {
 	config := &model.GlobalConfig{}
 
@@ -995,32 +1060,36 @@ func payloadToGlobalConfig(payload map[string]*qdrant.Value) (*model.GlobalConfi
 		config.UpdatedAt = &updatedAt
 	}
 
-	// Valueの取得
-	if v, ok := payload["value"]; ok {
-		// 文字列の場合
-		if strVal := v.GetStringValue(); strVal != "" {
-			config.Value = strVal
-		} else if intVal := v.GetIntegerValue(); v.GetIntegerValue() != 0 {
-			config.Value = intVal
-		} else if boolVal := v.GetBoolValue(); v.Kind != nil {
-			config.Value = boolVal
-		} else if structVal := v.GetStructValue(); structVal != nil && structVal.Fields != nil {
-			// structValueをJSONに変換
-			jsonBytes, err := json.Marshal(structVal.Fields)
-			if err == nil {
-				var value any
-				json.Unmarshal(jsonBytes, &value)
-				config.Value = value
-			}
-		} else if listVal := v.GetListValue(); listVal != nil {
-			// リスト値の場合
-			var values []any
-			for _, item := range listVal.Values {
-				if s := item.GetStringValue(); s != "" {
-					values = append(values, s)
+	// Valueの取得（型スイッチで正確に判定）
+	if v, ok := payload["value"]; ok && v != nil {
+		switch v.Kind.(type) {
+		case *qdrant.Value_StringValue:
+			config.Value = v.GetStringValue()
+		case *qdrant.Value_IntegerValue:
+			config.Value = v.GetIntegerValue()
+		case *qdrant.Value_DoubleValue:
+			config.Value = v.GetDoubleValue()
+		case *qdrant.Value_BoolValue:
+			config.Value = v.GetBoolValue()
+		case *qdrant.Value_StructValue:
+			structVal := v.GetStructValue()
+			if structVal != nil && structVal.Fields != nil {
+				// structValueをmap[string]anyに変換
+				result := make(map[string]any)
+				for key, field := range structVal.Fields {
+					result[key] = convertQdrantValue(field)
 				}
+				config.Value = result
 			}
-			config.Value = values
+		case *qdrant.Value_ListValue:
+			listVal := v.GetListValue()
+			if listVal != nil {
+				var values []any
+				for _, item := range listVal.Values {
+					values = append(values, convertQdrantValue(item))
+				}
+				config.Value = values
+			}
 		}
 	}
 
