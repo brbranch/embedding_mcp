@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -257,6 +258,103 @@ func (s *QdrantStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// Search はベクトル検索を実行する
+func (s *QdrantStore) Search(ctx context.Context, embedding []float32, opts SearchOptions) ([]SearchResult, error) {
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	// フィルタを構築
+	filter := buildSearchFilter(opts)
+
+	// Qdrantで検索実行
+	queryResp, err := s.client.Query(ctx, &qdrant.QueryPoints{
+		CollectionName: s.namespace,
+		Query:          qdrant.NewQuery(embedding...),
+		Filter:         filter,
+		Limit:          qdrant.PtrOf(uint64(opts.TopK)),
+		WithPayload:    qdrant.NewWithPayload(true),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query points: %w", err)
+	}
+
+	// 結果を変換
+	var results []SearchResult
+	for _, point := range queryResp {
+		note, err := payloadToNote(point.Payload)
+		if err != nil {
+			continue
+		}
+
+		// スコアを0-1に正規化 (Qdrantのcosine距離は-1〜1なので (score+1)/2)
+		score := float64((point.Score + 1.0) / 2.0)
+
+		results = append(results, SearchResult{
+			Note:  note,
+			Score: score,
+		})
+	}
+
+	// スコア降順でソート（念のため）
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
+
+	return results, nil
+}
+
+// ListRecent は最新のノートをリストする
+func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*model.Note, error) {
+	if !s.initialized {
+		return nil, ErrNotInitialized
+	}
+
+	// フィルタを構築
+	filter := buildListFilter(opts)
+
+	// Qdrantで全ポイントを取得
+	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
+		CollectionName: s.namespace,
+		Filter:         filter,
+		Limit:          qdrant.PtrOf(uint32(opts.Limit * 2)), // 余裕を持って取得
+		WithPayload:    qdrant.NewWithPayload(true),
+		WithVectors:    qdrant.NewWithVectors(false),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to scroll points: %w", err)
+	}
+
+	// payloadからNoteに変換
+	var notes []*model.Note
+	for _, point := range scrollResp {
+		note, err := payloadToNote(point.Payload)
+		if err != nil {
+			continue
+		}
+		notes = append(notes, note)
+	}
+
+	// createdAt降順でソート
+	sort.Slice(notes, func(i, j int) bool {
+		if notes[i].CreatedAt == nil || notes[j].CreatedAt == nil {
+			return false
+		}
+		ti, _ := time.Parse(time.RFC3339, *notes[i].CreatedAt)
+		tj, _ := time.Parse(time.RFC3339, *notes[j].CreatedAt)
+		return ti.After(tj)
+	})
+
+	// Limit制限
+	if opts.Limit > 0 && len(notes) > opts.Limit {
+		notes = notes[:opts.Limit]
+	}
+
+	return notes, nil
+}
+
 // Helper functions
 
 // hashID は文字列IDを数値IDに変換する（簡易実装）
@@ -266,6 +364,66 @@ func hashID(id string) uint64 {
 		hash = hash*31 + uint64(id[i])
 	}
 	return hash
+}
+
+// buildSearchFilter はSearchOptionsからQdrantのフィルタを構築する
+func buildSearchFilter(opts SearchOptions) *qdrant.Filter {
+	var conditions []*qdrant.Condition
+
+	// projectIDフィルタ（必須）
+	conditions = append(conditions, qdrant.NewMatch("projectId", opts.ProjectID))
+
+	// groupIDフィルタ（オプション）
+	if opts.GroupID != nil {
+		conditions = append(conditions, qdrant.NewMatch("groupId", *opts.GroupID))
+	}
+
+	// tagsフィルタ（AND検索）
+	for _, tag := range opts.Tags {
+		conditions = append(conditions, qdrant.NewMatch("tags", tag))
+	}
+
+	// 時間範囲フィルタ
+	if opts.Since != nil || opts.Until != nil {
+		rangeCondition := &qdrant.Range{}
+		if opts.Since != nil {
+			// since <= createdAt
+			sinceTimestamp := float64(opts.Since.Unix())
+			rangeCondition.Gte = &sinceTimestamp
+		}
+		if opts.Until != nil {
+			// createdAt < until
+			untilTimestamp := float64(opts.Until.Unix())
+			rangeCondition.Lt = &untilTimestamp
+		}
+		conditions = append(conditions, qdrant.NewRange("createdAtTimestamp", rangeCondition))
+	}
+
+	return &qdrant.Filter{
+		Must: conditions,
+	}
+}
+
+// buildListFilter はListOptionsからQdrantのフィルタを構築する
+func buildListFilter(opts ListOptions) *qdrant.Filter {
+	var conditions []*qdrant.Condition
+
+	// projectIDフィルタ（必須）
+	conditions = append(conditions, qdrant.NewMatch("projectId", opts.ProjectID))
+
+	// groupIDフィルタ（オプション）
+	if opts.GroupID != nil {
+		conditions = append(conditions, qdrant.NewMatch("groupId", *opts.GroupID))
+	}
+
+	// tagsフィルタ（AND検索）
+	for _, tag := range opts.Tags {
+		conditions = append(conditions, qdrant.NewMatch("tags", tag))
+	}
+
+	return &qdrant.Filter{
+		Must: conditions,
+	}
 }
 
 // buildPayload はNoteからQdrantのpayloadを構築する
@@ -285,6 +443,10 @@ func buildPayload(note *model.Note) map[string]*qdrant.Value {
 	}
 	if note.CreatedAt != nil {
 		payload["createdAt"], _ = qdrant.NewValue(*note.CreatedAt)
+		// 時間フィルタ用にタイムスタンプも保存
+		if t, err := time.Parse(time.RFC3339, *note.CreatedAt); err == nil {
+			payload["createdAtTimestamp"], _ = qdrant.NewValue(float64(t.Unix()))
+		}
 	}
 
 	// tags を *qdrant.Value のリストに変換

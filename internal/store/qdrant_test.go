@@ -42,6 +42,10 @@ func setupInitializedQdrantStore(t *testing.T) *QdrantStore {
 	store := setupQdrantTestStore(t)
 
 	ctx := context.Background()
+
+	// 既存のコレクションを削除（クリーンアップ）
+	_ = store.client.DeleteCollection(ctx, testQdrantNamespace)
+
 	if err := store.Initialize(ctx, testQdrantNamespace); err != nil {
 		t.Fatalf("Failed to initialize store: %v", err)
 	}
@@ -345,5 +349,329 @@ func TestQdrantStore_Close(t *testing.T) {
 
 	if err := store.Close(); err != nil {
 		t.Fatalf("Close failed: %v", err)
+	}
+}
+
+// TestQdrantStore_Search_Basic は基本的な検索をテスト
+func TestQdrantStore_Search_Basic(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	note1 := newQdrantTestNote("search-1", testQdrantProjectID, testQdrantGroupID, "Search test 1")
+	note2 := newQdrantTestNote("search-2", testQdrantProjectID, testQdrantGroupID, "Search test 2")
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+
+	opts := SearchOptions{
+		ProjectID: testQdrantProjectID,
+		TopK:      5,
+	}
+
+	results, err := store.Search(ctx, embedding, opts)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results, got %d", len(results))
+	}
+}
+
+// TestQdrantStore_Search_ProjectIDFilter はprojectIDフィルタをテスト
+func TestQdrantStore_Search_ProjectIDFilter(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	note1 := newQdrantTestNote("proj-1", testQdrantProjectID, testQdrantGroupID, "Project 1")
+	note2 := newQdrantTestNote("proj-2", "/other/project", testQdrantGroupID, "Project 2")
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+
+	opts := SearchOptions{
+		ProjectID: testQdrantProjectID,
+		TopK:      5,
+	}
+
+	results, err := store.Search(ctx, embedding, opts)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Note.ID != "proj-1" {
+		t.Errorf("Expected note 'proj-1', got '%s'", results[0].Note.ID)
+	}
+}
+
+// TestQdrantStore_Search_WithGroupIDFilter はgroupIDフィルタをテスト
+func TestQdrantStore_Search_WithGroupIDFilter(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	note1 := newQdrantTestNote("group-1", testQdrantProjectID, "group-a", "Group A")
+	note2 := newQdrantTestNote("group-2", testQdrantProjectID, "group-b", "Group B")
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+
+	groupID := "group-a"
+	opts := SearchOptions{
+		ProjectID: testQdrantProjectID,
+		GroupID:   &groupID,
+		TopK:      5,
+	}
+
+	results, err := store.Search(ctx, embedding, opts)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Note.GroupID != "group-a" {
+		t.Errorf("Expected groupID 'group-a', got '%s'", results[0].Note.GroupID)
+	}
+
+	// nil時はフィルタなし
+	opts.GroupID = nil
+	results, err = store.Search(ctx, embedding, opts)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results with nil groupID, got %d", len(results))
+	}
+}
+
+// TestQdrantStore_Search_WithTagsFilter はtagsフィルタをテスト
+func TestQdrantStore_Search_WithTagsFilter(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	note1 := newQdrantTestNoteWithTags("tag-1", testQdrantProjectID, testQdrantGroupID, "Note 1", []string{"go", "test"})
+	note2 := newQdrantTestNoteWithTags("tag-2", testQdrantProjectID, testQdrantGroupID, "Note 2", []string{"go"})
+	note3 := newQdrantTestNoteWithTags("tag-3", testQdrantProjectID, testQdrantGroupID, "Note 3", []string{"python"})
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+	store.AddNote(ctx, note3, embedding)
+
+	// AND検索: "go" AND "test"
+	opts := SearchOptions{
+		ProjectID: testQdrantProjectID,
+		Tags:      []string{"go", "test"},
+		TopK:      5,
+	}
+
+	results, err := store.Search(ctx, embedding, opts)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result with tags ['go', 'test'], got %d", len(results))
+	}
+	if len(results) > 0 && results[0].Note.ID != "tag-1" {
+		t.Errorf("Expected note 'tag-1', got '%s'", results[0].Note.ID)
+	}
+}
+
+// TestQdrantStore_Search_WithTimeRange は時間範囲フィルタをテスト
+func TestQdrantStore_Search_WithTimeRange(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	createdAt1 := "2024-01-10T10:00:00Z"
+	createdAt2 := "2024-01-15T10:00:00Z"
+	createdAt3 := "2024-01-20T10:00:00Z"
+
+	note1 := &model.Note{ID: "time-1", ProjectID: testQdrantProjectID, GroupID: testQdrantGroupID, Text: "Note 1", CreatedAt: &createdAt1, Tags: []string{}}
+	note2 := &model.Note{ID: "time-2", ProjectID: testQdrantProjectID, GroupID: testQdrantGroupID, Text: "Note 2", CreatedAt: &createdAt2, Tags: []string{}}
+	note3 := &model.Note{ID: "time-3", ProjectID: testQdrantProjectID, GroupID: testQdrantGroupID, Text: "Note 3", CreatedAt: &createdAt3, Tags: []string{}}
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+	store.AddNote(ctx, note3, embedding)
+
+	since := time.Date(2024, 1, 12, 0, 0, 0, 0, time.UTC)
+	until := time.Date(2024, 1, 18, 0, 0, 0, 0, time.UTC)
+
+	opts := SearchOptions{
+		ProjectID: testQdrantProjectID,
+		Since:     &since,
+		Until:     &until,
+		TopK:      5,
+	}
+
+	results, err := store.Search(ctx, embedding, opts)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result in time range, got %d", len(results))
+	}
+	if len(results) > 0 && results[0].Note.ID != "time-2" {
+		t.Errorf("Expected note 'time-2', got '%s'", results[0].Note.ID)
+	}
+}
+
+// TestQdrantStore_ListRecent_Basic は基本的なリスト取得をテスト
+func TestQdrantStore_ListRecent_Basic(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	createdAt1 := "2024-01-10T10:00:00Z"
+	createdAt2 := "2024-01-15T10:00:00Z"
+	createdAt3 := "2024-01-20T10:00:00Z"
+
+	note1 := &model.Note{ID: "list-1", ProjectID: testQdrantProjectID, GroupID: testQdrantGroupID, Text: "Note 1", CreatedAt: &createdAt1, Tags: []string{}}
+	note2 := &model.Note{ID: "list-2", ProjectID: testQdrantProjectID, GroupID: testQdrantGroupID, Text: "Note 2", CreatedAt: &createdAt2, Tags: []string{}}
+	note3 := &model.Note{ID: "list-3", ProjectID: testQdrantProjectID, GroupID: testQdrantGroupID, Text: "Note 3", CreatedAt: &createdAt3, Tags: []string{}}
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+	store.AddNote(ctx, note3, embedding)
+
+	opts := ListOptions{
+		ProjectID: testQdrantProjectID,
+		Limit:     10,
+	}
+
+	notes, err := store.ListRecent(ctx, opts)
+	if err != nil {
+		t.Fatalf("ListRecent failed: %v", err)
+	}
+
+	if len(notes) != 3 {
+		t.Errorf("Expected 3 notes, got %d", len(notes))
+	}
+
+	// createdAt降順確認
+	if len(notes) >= 3 {
+		if notes[0].ID != "list-3" {
+			t.Errorf("Expected first note 'list-3', got '%s'", notes[0].ID)
+		}
+		if notes[2].ID != "list-1" {
+			t.Errorf("Expected last note 'list-1', got '%s'", notes[2].ID)
+		}
+	}
+}
+
+// TestQdrantStore_ListRecent_WithLimit はLimit指定をテスト
+func TestQdrantStore_ListRecent_WithLimit(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	for i := 1; i <= 5; i++ {
+		note := newQdrantTestNote("limit-"+string(rune('0'+i)), testQdrantProjectID, testQdrantGroupID, "Note")
+		store.AddNote(ctx, note, embedding)
+	}
+
+	opts := ListOptions{
+		ProjectID: testQdrantProjectID,
+		Limit:     3,
+	}
+
+	notes, err := store.ListRecent(ctx, opts)
+	if err != nil {
+		t.Fatalf("ListRecent failed: %v", err)
+	}
+
+	if len(notes) != 3 {
+		t.Errorf("Expected 3 notes with limit, got %d", len(notes))
+	}
+}
+
+// TestQdrantStore_ListRecent_WithGroupIDFilter はgroupIDフィルタをテスト
+func TestQdrantStore_ListRecent_WithGroupIDFilter(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	note1 := newQdrantTestNote("list-group-1", testQdrantProjectID, "group-a", "Note A")
+	note2 := newQdrantTestNote("list-group-2", testQdrantProjectID, "group-b", "Note B")
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+
+	groupID := "group-a"
+	opts := ListOptions{
+		ProjectID: testQdrantProjectID,
+		GroupID:   &groupID,
+		Limit:     10,
+	}
+
+	notes, err := store.ListRecent(ctx, opts)
+	if err != nil {
+		t.Fatalf("ListRecent failed: %v", err)
+	}
+
+	if len(notes) != 1 {
+		t.Errorf("Expected 1 note with groupID filter, got %d", len(notes))
+	}
+	if len(notes) > 0 && notes[0].GroupID != "group-a" {
+		t.Errorf("Expected groupID 'group-a', got '%s'", notes[0].GroupID)
+	}
+}
+
+// TestQdrantStore_ListRecent_WithTagsFilter はtagsフィルタをテスト
+func TestQdrantStore_ListRecent_WithTagsFilter(t *testing.T) {
+	store := setupInitializedQdrantStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	embedding := dummyQdrantEmbedding(1536)
+
+	note1 := newQdrantTestNoteWithTags("list-tag-1", testQdrantProjectID, testQdrantGroupID, "Note 1", []string{"go", "test"})
+	note2 := newQdrantTestNoteWithTags("list-tag-2", testQdrantProjectID, testQdrantGroupID, "Note 2", []string{"go"})
+
+	store.AddNote(ctx, note1, embedding)
+	store.AddNote(ctx, note2, embedding)
+
+	opts := ListOptions{
+		ProjectID: testQdrantProjectID,
+		Tags:      []string{"go", "test"},
+		Limit:     10,
+	}
+
+	notes, err := store.ListRecent(ctx, opts)
+	if err != nil {
+		t.Fatalf("ListRecent failed: %v", err)
+	}
+
+	if len(notes) != 1 {
+		t.Errorf("Expected 1 note with tags filter, got %d", len(notes))
+	}
+	if len(notes) > 0 && notes[0].ID != "list-tag-1" {
+		t.Errorf("Expected note 'list-tag-1', got '%s'", notes[0].ID)
 	}
 }
