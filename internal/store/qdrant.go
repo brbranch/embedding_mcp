@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -423,11 +425,9 @@ func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 
 // hashID は文字列IDを数値IDに変換する（簡易実装）
 func hashID(id string) uint64 {
-	var hash uint64 = 0
-	for i := 0; i < len(id); i++ {
-		hash = hash*31 + uint64(id[i])
-	}
-	return hash
+	// SHA256ハッシュの先頭8バイトを使用して衝突耐性を向上
+	h := sha256.Sum256([]byte(id))
+	return binary.BigEndian.Uint64(h[:8])
 }
 
 // buildSearchFilter はSearchOptionsからQdrantのフィルタを構築する
