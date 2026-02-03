@@ -1141,3 +1141,30 @@ func TestQdrantStore_ListGroups_Basic(t *testing.T) {
 		t.Errorf("Expected 2 groups, got %d", len(groups))
 	}
 }
+
+// TestParseVectorDim はnamespaceからベクトル次元数を取得する関数をテスト
+func TestParseVectorDim(t *testing.T) {
+	tests := []struct {
+		namespace string
+		expected  uint64
+	}{
+		{"openai:text-embedding-3-small:1536", 1536},
+		{"openai:text-embedding-3-large:3072", 3072},
+		{"ollama:nomic-embed-text:768", 768},
+		{"provider:model:256", 256},
+		{"invalid-namespace", 1536},         // デフォルト
+		{"provider:model:invalid", 1536},    // パース失敗時デフォルト
+		{"single-part", 1536},               // デフォルト
+		{"two:parts", 1536},                 // デフォルト
+		{"", 1536},                          // 空文字でデフォルト
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.namespace, func(t *testing.T) {
+			result := parseVectorDim(tt.namespace)
+			if result != tt.expected {
+				t.Errorf("parseVectorDim(%q) = %d, expected %d", tt.namespace, result, tt.expected)
+			}
+		})
+	}
+}

@@ -44,6 +44,7 @@ type QdrantStore struct {
 	client      *qdrant.Client
 	url         string
 	namespace   string
+	vectorDim   uint64       // ベクトル次元数（namespaceから取得）
 	initialized bool
 	mu          sync.RWMutex // initializedフラグの保護
 }
@@ -94,11 +95,26 @@ func NewQdrantStore(urlStr string) (*QdrantStore, error) {
 	}, nil
 }
 
+// parseVectorDim はnamespaceからベクトル次元数を取得する
+// namespaceは "provider:model:dim" の形式（例: "openai:text-embedding-3-small:1536"）
+func parseVectorDim(namespace string) uint64 {
+	parts := strings.Split(namespace, ":")
+	if len(parts) >= 3 {
+		if dim, err := strconv.ParseUint(parts[len(parts)-1], 10, 64); err == nil {
+			return dim
+		}
+	}
+	return 1536 // デフォルト
+}
+
 // Initialize はストアを初期化する
 func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 	if s.client == nil {
 		return ErrConnectionFailed
 	}
+
+	// namespaceからベクトル次元数を取得
+	vectorDim := parseVectorDim(namespace)
 
 	// コレクション名をサニタイズ（Qdrantは ":" を許可しない）
 	collectionName := sanitizeCollectionName(namespace)
@@ -114,7 +130,7 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 		err = s.client.CreateCollection(ctx, &qdrant.CreateCollection{
 			CollectionName: collectionName,
 			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-				Size:     1536, // デフォルトの埋め込み次元数
+				Size:     vectorDim,
 				Distance: qdrant.Distance_Cosine,
 			}),
 		})
@@ -163,6 +179,7 @@ func (s *QdrantStore) Initialize(ctx context.Context, namespace string) error {
 
 	s.mu.Lock()
 	s.namespace = namespace
+	s.vectorDim = vectorDim
 	s.initialized = true
 	s.mu.Unlock()
 	return nil
@@ -394,11 +411,18 @@ func (s *QdrantStore) ListRecent(ctx context.Context, opts ListOptions) ([]*mode
 	// フィルタを構築
 	filter := buildListFilter(opts)
 
+	// Qdrant Scrollは順序保証がないため、十分な件数を取得してソートする
+	// 最低1000件、またはlimit*10のうち大きい方を取得
+	fetchLimit := opts.Limit * 10
+	if fetchLimit < 1000 {
+		fetchLimit = 1000
+	}
+
 	// Qdrantで全ポイントを取得
 	scrollResp, err := s.client.Scroll(ctx, &qdrant.ScrollPoints{
 		CollectionName: s.noteCollection(),
 		Filter:         filter,
-		Limit:          qdrant.PtrOf(uint32(opts.Limit * 2)), // 余裕を持って取得
+		Limit:          qdrant.PtrOf(uint32(fetchLimit)),
 		WithPayload:    qdrant.NewWithPayload(true),
 		WithVectors:    qdrant.NewWithVectors(false),
 	})
@@ -604,22 +628,11 @@ func payloadToNote(payload map[string]*qdrant.Value) (*model.Note, error) {
 		note.Tags = []string{}
 	}
 
-	// metadataの取得
-	if v, ok := payload["metadata"]; ok && v.GetStructValue() != nil {
-		metadata := make(map[string]any)
-		structVal := v.GetStructValue()
-		if structVal != nil && structVal.Fields != nil {
-			// structValueをJSONに変換してから戻す
-			jsonBytes, err := json.Marshal(structVal.Fields)
-			if err != nil {
-				log.Printf("warning: failed to marshal metadata: %v", err)
-			} else {
-				if err := json.Unmarshal(jsonBytes, &metadata); err != nil {
-					log.Printf("warning: failed to unmarshal metadata: %v", err)
-				} else {
-					note.Metadata = metadata
-				}
-			}
+	// metadataの取得（convertQdrantValueを使用して型を正確に復元）
+	if v, ok := payload["metadata"]; ok && v != nil {
+		converted := convertQdrantValue(v)
+		if metadata, ok := converted.(map[string]any); ok {
+			note.Metadata = metadata
 		}
 	}
 
