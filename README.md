@@ -235,6 +235,77 @@ AI: memory.add_note で規約を保存
 AI: memory.search で関連メモを検索して回答
 ```
 
+## VectorStore の選択
+
+### SQLite vs Qdrant
+
+| 観点 | SQLite | Qdrant |
+|------|--------|--------|
+| スケール | 〜5,000件 | 100,000件以上 |
+| 検索速度 | 中程度 | 高速 |
+| セットアップ | シンプル（ファイルのみ） | Docker 必要 |
+| 外部サービス | 不要 | Qdrant サーバー |
+| 推奨用途 | 開発・小規模 | 本番・大規模 |
+
+### 推奨構成
+
+- **小規模（〜5,000件）**: SQLiteStore + OpenAI Embedder
+- **中〜大規模（5,000件以上）**: QdrantStore + OpenAI Embedder
+- **開発・テスト**: MemoryStore + OpenAI Embedder
+
+### Qdrant のセットアップ
+
+#### Step 1: Docker Compose で起動
+
+`docker-compose.yml`（リポジトリに含まれています）:
+
+```yaml
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mcp-memory-qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__LOG_LEVEL=INFO
+    restart: unless-stopped
+
+volumes:
+  qdrant_storage:
+```
+
+起動:
+
+```bash
+docker-compose up -d
+```
+
+#### Step 2: config.json の設定
+
+```json
+{
+  "embedder": {
+    "provider": "openai",
+    "model": "text-embedding-3-small"
+  },
+  "store": {
+    "type": "qdrant",
+    "url": "http://localhost:6333"
+  }
+}
+```
+
+#### Step 3: 動作確認
+
+```bash
+curl http://localhost:6333/health
+```
+
 ## CLIオプション
 
 ### serve コマンド
@@ -320,13 +391,16 @@ exit 0
 | embedder | model | text-embedding-3-small | 埋め込みモデル名 |
 | embedder | apiKey | null | APIキー（環境変数優先） |
 | embedder | dim | 0 | 埋め込み次元数（0=自動） |
-| store | type | sqlite | ストア種別 (sqlite) |
+| store | type | sqlite | ストア種別 (**sqlite**, **qdrant**) |
 | store | path | \<dataDir>/memory.db | SQLiteデータベースパス |
+| store | url | http://localhost:6333 | Qdrant REST API URL（qdrant使用時） |
 | transportDefaults | defaultTransport | stdio | デフォルトトランスポート |
 | paths | configPath | ~/.local-mcp-memory/config.json | 設定ファイルパス |
 | paths | dataDir | ~/.local-mcp-memory/data | データディレクトリ |
 
 ### 設定例
+
+**SQLite を使用する場合（デフォルト）**:
 
 ```json
 {
@@ -338,6 +412,22 @@ exit 0
   "store": {
     "type": "sqlite",
     "path": "~/.local-mcp-memory/data/memory.db"
+  }
+}
+```
+
+**Qdrant を使用する場合**:
+
+```json
+{
+  "embedder": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "apiKey": "sk-..."
+  },
+  "store": {
+    "type": "qdrant",
+    "url": "http://localhost:6333"
   }
 }
 ```
@@ -454,6 +544,12 @@ echo '{"jsonrpc":"2.0","id":1,"method":"memory.group_list","params":{"projectId"
 
 - CLAUDE.md に運用ルールを追記してください（Step 5参照）
 
+**Q: Qdrant に接続できない**
+
+- Docker が起動しているか確認: `docker-compose ps`
+- ポート 6333 が開いているか確認: `curl http://localhost:6333/health`
+- ログ確認: `docker-compose logs qdrant`
+
 ## Pythonクライアント
 
 `clients/python` に Python クライアントライブラリが含まれています。
@@ -509,16 +605,18 @@ go test ./e2e/... -tags=e2e -v
 
 ### 実装済み
 
-- **SQLiteStore**: 軽量用途向けSQLite実装（5,000件程度まで推奨、cgo不要）
+- **SQLiteStore**: 軽量用途向け（〜5,000件推奨）
+- **QdrantStore**: 大規模用途向け（Docker で Qdrant サーバーを起動）
 - **MemoryStore**: インメモリ実装（テスト・開発用）
 - **OpenAI Embedder**: OpenAI Embeddings API連携
 
 ### 未実装（将来実装予定）
 
-- **ChromaStore**: 大規模用途向けChroma連携
+- **ChromaStore**: Chroma連携
 - **Ollama Embedder**: ローカルLLMによる埋め込み生成
 - **Local Embedder**: ローカルモデル対応
 
 **現在の推奨構成**:
-- 小規模〜中規模（〜5,000件）: **SQLiteStore** + OpenAI Embedder
+- 小規模（〜5,000件）: **SQLiteStore** + OpenAI Embedder
+- 中〜大規模（5,000件以上）: **QdrantStore** + OpenAI Embedder
 - 開発・テスト: **MemoryStore** + OpenAI Embedder
